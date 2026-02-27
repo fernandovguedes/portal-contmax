@@ -32,3 +32,6 @@ verify_jwt = false
 
 [functions.process-integration-job]
 verify_jwt = false
+
+[functions.set-password-noauth]
+verify_jwt = false
