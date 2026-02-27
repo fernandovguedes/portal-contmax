@@ -48,15 +48,7 @@ export type Database = {
           portal_company_id?: string
           tenant_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "bc_contracts_portal_company_id_fkey"
-            columns: ["portal_company_id"]
-            isOneToOne: false
-            referencedRelation: "empresas"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       bc_invoice_map: {
         Row: {
@@ -113,15 +105,7 @@ export type Database = {
           synced_at?: string | null
           tenant_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "bc_invoice_map_portal_company_id_fkey"
-            columns: ["portal_company_id"]
-            isOneToOne: false
-            referencedRelation: "empresas"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       bc_sync_log: {
         Row: {
@@ -160,15 +144,7 @@ export type Database = {
           response_json?: Json | null
           tenant_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "bc_sync_log_portal_company_id_fkey"
-            columns: ["portal_company_id"]
-            isOneToOne: false
-            referencedRelation: "empresas"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       empresas: {
         Row: {
@@ -546,15 +522,7 @@ export type Database = {
           status?: string
           tenant_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "onecode_contact_match_log_company_id_fkey"
-            columns: ["company_id"]
-            isOneToOne: false
-            referencedRelation: "empresas"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       onecode_contact_review: {
         Row: {
@@ -599,15 +567,7 @@ export type Database = {
           suggested_company_name?: string
           tenant_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "onecode_contact_review_suggested_company_id_fkey"
-            columns: ["suggested_company_id"]
-            isOneToOne: false
-            referencedRelation: "empresas"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       onecode_messages_raw: {
         Row: {
@@ -875,7 +835,15 @@ export type Database = {
           total_skipped?: number
           total_updated?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "sync_jobs_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sync_logs: {
         Row: {
@@ -966,6 +934,13 @@ export type Database = {
             referencedRelation: "integration_providers"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "tenant_integrations_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
+          },
         ]
       }
       user_modules: {
@@ -1008,7 +983,7 @@ export type Database = {
         }
         Insert: {
           id?: string
-          role: Database["public"]["Enums"]["app_role"]
+          role?: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
         Update: {
@@ -1040,7 +1015,15 @@ export type Database = {
           tenant_id?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "user_tenants_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       whatsapp_logs: {
         Row: {
@@ -1097,15 +1080,7 @@ export type Database = {
           to?: string
           user_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "whatsapp_logs_empresa_id_fkey"
-            columns: ["empresa_id"]
-            isOneToOne: false
-            referencedRelation: "empresas"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
     }
     Views: {

@@ -1,1 +1,34 @@
-project_id = "cgdxdawwiarzwfxwjqvx"
+project_id = "dpgfvvxxaoikdbfrqhwp"
+
+[functions.send-whatsapp]
+verify_jwt = false
+
+[functions.send-whatsapp-batch]
+verify_jwt = false
+
+[functions.sync-acessorias]
+verify_jwt = false
+
+[functions.onecode-webhook]
+verify_jwt = false
+
+[functions.onecode-score-ticket]
+verify_jwt = false
+
+[functions.sync-bomcontrole]
+verify_jwt = false
+
+[functions.sync-bomcontrole-cron]
+verify_jwt = false
+
+[functions.close-bomcontrole-contracts]
+verify_jwt = false
+
+[functions.sync-onecode-contacts]
+verify_jwt = false
+
+[functions.run-integration]
+verify_jwt = false
+
+[functions.process-integration-job]
+verify_jwt = false
