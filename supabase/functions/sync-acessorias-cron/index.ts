@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { sha256, sleep, normalizeKey, formatCnpj } from "../_shared/utils.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,33 +9,6 @@ const corsHeaders = {
 
 const THROTTLE_MS = 750;
 const TENANTS = ["contmax", "pg"] as const;
-
-async function sha256(text: string): Promise<string> {
-  const data = new TextEncoder().encode(text);
-  const hash = await crypto.subtle.digest("SHA-256", data);
-  return Array.from(new Uint8Array(hash))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
-
-function sleep(ms: number) {
-  return new Promise((r) => setTimeout(r, ms));
-}
-
-function normalizeKey(raw: string): string {
-  return raw.replace(/[.\-\/]/g, "").trim();
-}
-
-function formatCnpj(raw: string): string {
-  const digits = raw.replace(/\D/g, "");
-  if (digits.length === 14) {
-    return digits.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5");
-  }
-  if (digits.length === 11) {
-    return digits.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, "$1.$2.$3-$4");
-  }
-  return raw;
-}
 
 interface SyncCounters {
   totalRead: number;

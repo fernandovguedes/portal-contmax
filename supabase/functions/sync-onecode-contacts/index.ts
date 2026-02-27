@@ -1,62 +1,11 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { jaroWinkler, normalizeNome as normalize } from "../_shared/utils.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
-
-// ── Jaro-Winkler ──────────────────────────────────────────────
-function jaroWinkler(s1: string, s2: string): number {
-  if (s1 === s2) return 1;
-  const len1 = s1.length,
-    len2 = s2.length;
-  if (!len1 || !len2) return 0;
-  const matchDist = Math.max(Math.floor(Math.max(len1, len2) / 2) - 1, 0);
-  const s1m = new Array(len1).fill(false);
-  const s2m = new Array(len2).fill(false);
-  let matches = 0,
-    transpositions = 0;
-  for (let i = 0; i < len1; i++) {
-    const start = Math.max(0, i - matchDist);
-    const end = Math.min(i + matchDist + 1, len2);
-    for (let j = start; j < end; j++) {
-      if (s2m[j] || s1[i] !== s2[j]) continue;
-      s1m[i] = true;
-      s2m[j] = true;
-      matches++;
-      break;
-    }
-  }
-  if (!matches) return 0;
-  let k = 0;
-  for (let i = 0; i < len1; i++) {
-    if (!s1m[i]) continue;
-    while (!s2m[k]) k++;
-    if (s1[i] !== s2[k]) transpositions++;
-    k++;
-  }
-  const jaro =
-    (matches / len1 + matches / len2 + (matches - transpositions / 2) / matches) / 3;
-  let prefix = 0;
-  for (let i = 0; i < Math.min(4, Math.min(len1, len2)); i++) {
-    if (s1[i] === s2[i]) prefix++;
-    else break;
-  }
-  return jaro + prefix * 0.1 * (1 - jaro);
-}
-
-// ── Normalize ─────────────────────────────────────────────────
-function normalize(name: string): string {
-  return name
-    .toUpperCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\b(LTDA|ME|EPP|EIRELI|SA|S\.A\.?|S\/A)\b/g, "")
-    .replace(/[^A-Z0-9 ]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
 
 function extractCompanyName(contactName: string): string {
   const parts = contactName.split(" - ");

@@ -1,4 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { sanitizeForLog } from "../_shared/utils.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -31,11 +32,6 @@ function getApiKey(tenantId: string): string {
   return key;
 }
 
-function sanitizeForLog(obj: unknown): unknown {
-  if (!obj) return obj;
-  const s = JSON.stringify(obj);
-  return JSON.parse(s.replace(/ApiKey\s+[^\s"]+/gi, "ApiKey ***"));
-}
 
 async function fetchWithRetry(url: string, options: RequestInit, retries = 2): Promise<Response> {
   for (let i = 0; i <= retries; i++) {
