@@ -1,60 +1,50 @@
 
-## Diagnosticar e Corrigir Sincronizacao Acessorias
 
-### Problema Identificado
+## Problema Identificado
 
-Analisei os dados e encontrei uma situacao contraditoria:
+Seu email `fernandov.guedes@gmail.com` tem dois registros na tabela `profiles`:
+- Um perfil antigo (criado manualmente) que possui a role `admin`
+- Um perfil novo (criado via `auth.users`) que nao possui role `admin`
 
-- **Ultima sync PG**: leu 4.780 registros da API, reportou TODOS como "ignorados" (skipped), 0 criados, 0 atualizados
-- **Ultima sync Contmax**: leu 108.580 registros, mesma situacao - 0 criados, 0 atualizados
-- **No banco**: as 519 empresas PG e 301 Contmax NAO possuem `hash_payload`, `synced_at` ou `external_source` - comprovando que o sync nunca modificou nenhum registro
+A role de admin esta vinculada ao perfil errado.
 
-Isso indica que o sync esta lendo dados da API mas nao esta criando nem atualizando registros no banco. O problema pode estar na logica de matching por CNPJ (formato diferente entre API e banco) ou na resposta da API.
+## Plano de Correcao
 
-### Plano de Acao
+### Passo 1: Adicionar role admin ao usuario correto
+Inserir a role `admin` para o user_id `6a53df87-dbd5-46b3-bf52-1febeafb2312` (o que existe no `auth.users`).
 
-**1. Adicionar logging diagnostico detalhado na edge function `sync-acessorias`**
+### Passo 2: Resetar a senha
+Usar a edge function `reset-user-password` ou atualizar diretamente via migration para definir uma nova senha para o usuario.
 
-Na funcao `processBatch`, adicionar `console.log` nos primeiros 3 registros de cada batch para registrar:
-- O CNPJ bruto vindo da API (`rawKey`)
-- O CNPJ formatado (`formattedKey`)
-- Se encontrou registro existente ou nao (`existing`)
-- Se o hash eh diferente ou igual
-- Se fez insert, update ou skip
+Como a edge function precisa de autenticacao admin (que voce ainda nao tem), a solucao mais direta e usar uma migracao SQL para:
+- Atualizar a senha via `auth.users`
+- Garantir a role admin no perfil correto
 
-Isso vai revelar exatamente onde o fluxo esta falhando.
-
-**2. Corrigir potencial problema de matching de CNPJ**
-
-Possivel causa: se a API retorna CNPJ em formato que nao resulta em 11 ou 14 digitos, o `formatCnpj` retorna o valor bruto, que pode nao bater com o formato armazenado no banco (ex: "59.220.274/0001-39").
-
-A correcao sera normalizar o CNPJ para comparacao:
-- Sempre comparar por digitos puros (sem pontuacao)
-- Ou garantir que o formato seja consistente antes da query
-
-**3. Investigar volume de dados da API**
-
-Contmax com 108.580 registros eh um numero muito alto (301 empresas no banco). Isso sugere que:
-- A API pode estar retornando dados duplicados em paginas diferentes
-- Ou o endpoint `/companies/ListAll` retorna entidades que nao sao empresas
-
-Adicionar log do `totalPages` retornado pela API e do tamanho do array por pagina.
-
-**4. Executar sync de teste e analisar logs**
-
-Apos o deploy da funcao com logs diagnosticos:
-- Executar sync para PG
-- Analisar os logs para entender o formato real dos dados da API
-- Corrigir a logica de matching/insert conforme necessario
+### Passo 3: Limpar perfil duplicado
+Remover o perfil orfao (`8ac5d683...`) que nao tem usuario correspondente no `auth.users`, e migrar a role admin dele para o perfil correto.
 
 ### Detalhes Tecnicos
 
-**Arquivo:** `supabase/functions/sync-acessorias/index.ts`
+Migration SQL:
+```sql
+-- 1. Adicionar role admin ao usuario correto (auth.users)
+INSERT INTO public.user_roles (user_id, role)
+VALUES ('6a53df87-dbd5-46b3-bf52-1febeafb2312', 'admin')
+ON CONFLICT (user_id, role) DO NOTHING;
 
-Mudancas principais:
-- Adicionar `console.log` nos 3 primeiros registros de cada batch com detalhes do rawKey, formattedKey, existing result
-- Normalizar CNPJ para formato consistente antes da query (usar apenas digitos para busca e armazenar formatado)
-- Adicionar log da resposta raw da API (primeiros registros + metadata de paginacao)
-- Considerar alterar a query de busca para usar `external_key` (digitos puros) alem do `cnpj` formatado
+-- 2. Remover role admin do perfil orfao
+DELETE FROM public.user_roles
+WHERE user_id = '8ac5d683-d908-441f-a15a-573b9cec6612';
 
-**Nenhuma alteracao no banco** sera necessaria nesta etapa - o foco eh diagnosticar e corrigir a logica da edge function.
+-- 3. Remover perfil orfao
+DELETE FROM public.profiles
+WHERE id = '8ac5d683-d908-441f-a15a-573b9cec6612';
+```
+
+Para a senha, sera necessario redefini-la pelo painel do Supabase:
+- Acessar Authentication > Users no dashboard
+- Localizar `fernandov.guedes@gmail.com`
+- Usar "Send password reset" ou definir uma nova senha
+
+Apos isso, voce podera fazer login normalmente com acesso admin.
+
