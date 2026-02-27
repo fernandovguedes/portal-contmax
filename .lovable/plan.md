@@ -1,50 +1,27 @@
 
 
-## Problema Identificado
+## Redefinir senha diretamente via Edge Function
 
-Seu email `fernandov.guedes@gmail.com` tem dois registros na tabela `profiles`:
-- Um perfil antigo (criado manualmente) que possui a role `admin`
-- Um perfil novo (criado via `auth.users`) que nao possui role `admin`
+Como os links de reset do Supabase nao estao funcionando (erro "Email link is invalid or has expired" nos logs), vou criar uma edge function temporaria para definir sua senha sem precisar de autenticacao.
 
-A role de admin esta vinculada ao perfil errado.
+### Passo 1: Criar edge function temporaria
+Criar `set-password-noauth` que usa uma chave secreta interna (SUPABASE_SERVICE_ROLE_KEY) para atualizar a senha do usuario diretamente, sem exigir login.
 
-## Plano de Correcao
+### Passo 2: Coletar sua senha
+Vou pedir que voce informe a senha desejada no chat. A funcao vai atualizar a senha do usuario `6a53df87-dbd5-46b3-bf52-1febeafb2312` (fernandov.guedes@gmail.com).
 
-### Passo 1: Adicionar role admin ao usuario correto
-Inserir a role `admin` para o user_id `6a53df87-dbd5-46b3-bf52-1febeafb2312` (o que existe no `auth.users`).
+### Passo 3: Chamar a funcao e definir a senha
+Executar a edge function para aplicar a nova senha.
 
-### Passo 2: Resetar a senha
-Usar a edge function `reset-user-password` ou atualizar diretamente via migration para definir uma nova senha para o usuario.
-
-Como a edge function precisa de autenticacao admin (que voce ainda nao tem), a solucao mais direta e usar uma migracao SQL para:
-- Atualizar a senha via `auth.users`
-- Garantir a role admin no perfil correto
-
-### Passo 3: Limpar perfil duplicado
-Remover o perfil orfao (`8ac5d683...`) que nao tem usuario correspondente no `auth.users`, e migrar a role admin dele para o perfil correto.
+### Passo 4: Limpar
+Remover a edge function temporaria apos uso, por seguranca.
 
 ### Detalhes Tecnicos
 
-Migration SQL:
-```sql
--- 1. Adicionar role admin ao usuario correto (auth.users)
-INSERT INTO public.user_roles (user_id, role)
-VALUES ('6a53df87-dbd5-46b3-bf52-1febeafb2312', 'admin')
-ON CONFLICT (user_id, role) DO NOTHING;
-
--- 2. Remover role admin do perfil orfao
-DELETE FROM public.user_roles
-WHERE user_id = '8ac5d683-d908-441f-a15a-573b9cec6612';
-
--- 3. Remover perfil orfao
-DELETE FROM public.profiles
-WHERE id = '8ac5d683-d908-441f-a15a-573b9cec6612';
-```
-
-Para a senha, sera necessario redefini-la pelo painel do Supabase:
-- Acessar Authentication > Users no dashboard
-- Localizar `fernandov.guedes@gmail.com`
-- Usar "Send password reset" ou definir uma nova senha
-
-Apos isso, voce podera fazer login normalmente com acesso admin.
+A edge function `set-password-noauth/index.ts`:
+- Aceita POST com `{ "password": "...", "secret": "..." }`
+- Valida um token secreto hardcoded para evitar uso indevido
+- Usa `supabase.auth.admin.updateUserById()` com o service role key
+- Atualiza a senha do user_id fixo (`6a53df87...`)
+- Sera deletada apos o uso
 
