@@ -5,8 +5,9 @@
  * Run: deno task test:integration  (from supabase/ directory)
  */
 
-import { assertEquals, assert } from "@std/assert";
 import {
+  assertEquals,
+  assert,
   integrationEnvReady,
   adminEnvReady,
   postJson,

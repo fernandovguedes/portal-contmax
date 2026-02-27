@@ -53,3 +53,18 @@ export async function getReq(
 export function bearerAuth(jwt: string): Record<string, string> {
   return { Authorization: `Bearer ${jwt}` };
 }
+
+// ── Minimal assertion helpers (no external deps) ─────────────
+
+export function assertEquals<T>(actual: T, expected: T, msg?: string): void {
+  if (actual !== expected) {
+    throw new Error(
+      msg ??
+        `assertEquals failed:\n  actual:   ${JSON.stringify(actual)}\n  expected: ${JSON.stringify(expected)}`,
+    );
+  }
+}
+
+export function assert(condition: boolean, msg?: string): void {
+  if (!condition) throw new Error(msg ?? "assert failed");
+}

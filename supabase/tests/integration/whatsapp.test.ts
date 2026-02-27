@@ -9,8 +9,9 @@
  * `ignore: true` by default to avoid unintentional sends.
  */
 
-import { assertEquals, assert } from "@std/assert";
 import {
+  assertEquals,
+  assert,
   integrationEnvReady,
   adminEnvReady,
   postJson,
