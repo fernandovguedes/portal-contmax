@@ -146,6 +146,15 @@ export function useIntegrationJobs(tenantIds?: string[]) {
 
       toast({ title: "Job criado", description: `Integração ${providerSlug} adicionada à fila.` });
 
+      // Trigger the worker to process the pending job.
+      // This is a separate call because Supabase Edge Functions cannot reliably
+      // do fire-and-forget inter-function calls (Deno kills pending fetches on return).
+      supabase.functions.invoke("process-integration-job", {
+        body: {},
+      }).catch((err) => {
+        console.error("Failed to trigger worker:", err);
+      });
+
       // Short delay refetch as fallback if realtime is slow
       setTimeout(() => fetchJobs(), 2000);
 
