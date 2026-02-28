@@ -85,13 +85,20 @@ async function processBatch(
       : [];
 
     if (companies.length === 0) {
-      console.log(`[sync-acessorias] Page ${page}: empty response. Keys in data: ${Object.keys(data || {}).join(", ")}`);
+      console.log(`[sync-acessorias] Page ${page}: empty response — end of data. Keys in data: ${Object.keys(data || {}).join(", ")}`);
       return { counters: c, nextPage: null, totalPages };
     }
 
+    // Detect last page: if fewer items than expected page size, this is the final page
+    const isLastPage = companies.length < 20;
+
     if (page === startPage || totalPages === 0) {
-      totalPages = data?.totalPages || data?.total_pages || 0;
-      console.log(`[sync-acessorias] Page ${page}: ${companies.length} companies, totalPages=${totalPages}, response keys: ${Object.keys(data || {}).join(", ")}`);
+      totalPages = data?.totalPages || data?.total_pages || data?.TotalPages || 0;
+      if (!totalPages && !isLastPage) {
+        console.log(`[sync-acessorias] Page ${page}: ${companies.length} companies, totalPages=UNKNOWN (API doesnt provide it), response keys: ${Object.keys(data || {}).join(", ")}`);
+      } else {
+        console.log(`[sync-acessorias] Page ${page}: ${companies.length} companies, totalPages=${totalPages || "last"}, response keys: ${Object.keys(data || {}).join(", ")}`);
+      }
     }
 
     // Log first company RAW JSON for diagnostics
@@ -100,6 +107,12 @@ async function processBatch(
       if (companies.length > 1) {
         console.log(`[sync-acessorias] DIAG RAW company[1]: ${JSON.stringify(companies[1])}`);
       }
+    }
+
+    // Log first ID of every page to detect pagination loops
+    if (companies[0]) {
+      const firstId = companies[0].ID || companies[0].id || companies[0].Identificador || "?";
+      console.log(`[sync-acessorias] Page ${page}: firstId=${firstId}, count=${companies.length}`);
     }
 
     for (const company of companies) {
@@ -260,7 +273,14 @@ async function processBatch(
       await supabase.from("integration_jobs").update({ progress: pct }).eq("id", integrationJobId);
     }
 
+    // Stop conditions: reached totalPages OR last page (fewer items than page size)
+    if (isLastPage) {
+      console.log(`[sync-acessorias] Page ${page}: only ${companies.length} items (< 20) — last page reached`);
+      return { counters: c, nextPage: null, totalPages };
+    }
+
     if (totalPages && page >= totalPages) {
+      console.log(`[sync-acessorias] Page ${page}: reached totalPages=${totalPages} — stopping`);
       return { counters: c, nextPage: null, totalPages };
     }
 
@@ -322,11 +342,15 @@ async function finalizeIntegrationJob(
   // Retrigger worker
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  fetch(`${supabaseUrl}/functions/v1/process-integration-job`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceRoleKey}` },
-    body: JSON.stringify({}),
-  }).catch((err) => console.error("[sync-acessorias] Failed to retrigger worker:", err));
+  try {
+    await fetch(`${supabaseUrl}/functions/v1/process-integration-job`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceRoleKey}` },
+      body: JSON.stringify({}),
+    });
+  } catch (err) {
+    console.error("[sync-acessorias] Failed to retrigger worker:", err);
+  }
 
   console.log(`[sync-acessorias] Integration job ${integrationJobId} finalized — status=${status}, time=${executionTime}ms`);
 }
@@ -342,11 +366,12 @@ async function continueNextBatch(params: Record<string, any>) {
   console.log(`[sync-acessorias] Continuing with next batch — start_page=${params.start_page}`);
 
   try {
-    await fetch(url, {
+    const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceRoleKey}` },
       body: JSON.stringify(params),
     });
+    console.log(`[sync-acessorias] Next batch triggered — status=${res.status}`);
   } catch (err) {
     console.error("[sync-acessorias] Failed to invoke next batch:", err);
   }
@@ -499,8 +524,8 @@ Deno.serve(async (req) => {
       // More pages — self-invoke for next batch (fire-and-forget)
       console.log(`[sync-acessorias] Batch done (pages ${startPage}-${result.nextPage - 1}). Scheduling next batch starting at page ${result.nextPage}.`);
 
-      // Fire-and-forget the next batch
-      continueNextBatch({
+      // Fire next batch — must await so Deno completes the request
+      await continueNextBatch({
         tenant_slug: tenantSlug,
         tenant_id: tenantId,
         integration_job_id: integrationJobId,
