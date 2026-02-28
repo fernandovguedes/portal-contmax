@@ -265,6 +265,10 @@ Deno.serve(async (req: Request) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const startTime = Date.now();
+  let integrationJobId: string | null = null;
+  let tenantIntegrationId: string | null = null;
+
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -272,7 +276,9 @@ Deno.serve(async (req: Request) => {
 
     const url = new URL(req.url);
     const body = await req.json().catch(() => ({}));
-    const action = url.searchParams.get("action") ?? body.action ?? "sync_values";
+    integrationJobId = body.integration_job_id || null;
+    tenantIntegrationId = body.tenant_integration_id || null;
+    const action = url.searchParams.get("action") ?? body.action ?? (integrationJobId ? "sync_payments" : "sync_values");
 
     if (action === "sync_values") {
       const { tenant_id, competencia, items } = body as { tenant_id: string; competencia: string; items: SyncItem[] };
@@ -300,9 +306,38 @@ Deno.serve(async (req: Request) => {
     }
 
     if (action === "sync_payments") {
-      const tenantId = url.searchParams.get("tenant_id") ?? body.tenant_id ?? "contmax";
-      const apiKey = getApiKey(tenantId);
-      const result = await syncPayments(supabase, tenantId, apiKey);
+      // Resolve tenant slug from UUID if needed
+      let tenantSlug = url.searchParams.get("tenant_id") ?? body.tenant_id ?? "contmax";
+      // If it looks like a UUID, resolve the slug
+      if (tenantSlug.includes("-")) {
+        const { data: org } = await supabase.from("organizacoes").select("slug").eq("id", tenantSlug).maybeSingle();
+        if (org) tenantSlug = org.slug;
+      }
+      const apiKey = getApiKey(tenantSlug);
+      const result = await syncPayments(supabase, tenantSlug, apiKey);
+
+      // Finalize integration_job if present
+      if (integrationJobId) {
+        const executionTime = Date.now() - startTime;
+        await supabase.from("integration_jobs").update({
+          status: "success", progress: 100,
+          finished_at: new Date().toISOString(), execution_time_ms: executionTime,
+          result: result,
+        }).eq("id", integrationJobId);
+        if (tenantIntegrationId) {
+          await supabase.from("tenant_integrations").update({ last_status: "success", last_error: null }).eq("id", tenantIntegrationId);
+        }
+        await supabase.from("integration_logs").insert({
+          tenant_id: tenantSlug, integration: "bomcontrole", provider_slug: "bomcontrole",
+          status: "success", execution_time_ms: executionTime,
+          total_processados: result.processed, total_matched: result.paid,
+        });
+        // Retrigger worker
+        fetch(`${supabaseUrl}/functions/v1/process-integration-job`, {
+          method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` }, body: "{}",
+        }).catch(() => {});
+      }
+
       return new Response(JSON.stringify(result), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -313,6 +348,24 @@ Deno.serve(async (req: Request) => {
     });
   } catch (err) {
     console.error("sync-bomcontrole error:", err);
+    // Finalize integration_job on error
+    if (integrationJobId) {
+      try {
+        const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+        const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+        const supabase = createClient(supabaseUrl, serviceKey);
+        await supabase.from("integration_jobs").update({
+          status: "error", progress: 0, error_message: String(err),
+          finished_at: new Date().toISOString(), execution_time_ms: Date.now() - startTime,
+        }).eq("id", integrationJobId);
+        if (tenantIntegrationId) {
+          await supabase.from("tenant_integrations").update({ last_status: "error", last_error: String(err) }).eq("id", tenantIntegrationId);
+        }
+        fetch(`${supabaseUrl}/functions/v1/process-integration-job`, {
+          method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` }, body: "{}",
+        }).catch(() => {});
+      } catch (_) {}
+    }
     return new Response(JSON.stringify({ error: String(err) }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

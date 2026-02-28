@@ -120,14 +120,12 @@ async function processBatch(
       console.log(`[sync-acessorias] Page ${page}: ${companies.length} companies, totalPages=${totalPages}, response keys: ${Object.keys(data || {}).join(", ")}`);
     }
 
-    // Log first 3 companies of each batch for diagnostics
-    const samplesToLog = Math.min(3, companies.length);
-    for (let i = 0; i < samplesToLog; i++) {
-      const company = companies[i];
-      const rawKey = company.Identificador || company.cnpj || company.cpf || company.identificador || company.document || "";
-      const digits = rawKey.replace(/\D/g, "");
-      const formattedKey = formatCnpj(rawKey);
-      console.log(`[sync-acessorias] DIAG company[${i}]: rawKey="${rawKey}" digits="${digits}" formattedKey="${formattedKey}" nome="${company.Razao || company.razaoSocial || company.nome || "?"}" keys=${Object.keys(company).join(",")}`);
+    // Log first company RAW JSON for diagnostics
+    if (page === startPage && companies.length > 0) {
+      console.log(`[sync-acessorias] DIAG RAW company[0]: ${JSON.stringify(companies[0])}`);
+      if (companies.length > 1) {
+        console.log(`[sync-acessorias] DIAG RAW company[1]: ${JSON.stringify(companies[1])}`);
+      }
     }
 
     for (const company of companies) {
