@@ -1,41 +1,60 @@
 
+# Filtrar empresas ativas + Baixar inativas automaticamente
 
-# Fix: Replicar fluxo OneCode para Contmax
+## Problema atual
 
-## Problema Identificado
+O sync do Acessorias processa ~38.000 empresas (1.900+ paginas), incluindo inativas. Isso e lento e desnecessario. Alem disso, quando uma empresa e baixada no Acessorias, o portal nao reflete essa mudanca.
 
-O fluxo ja esta configurado para Contmax no webhook (header `x-onecode-source: contmax`), e o webhook JA recebe eventos (35 ate agora). Porem, **todas as 32 mensagens falham** ao serem salvas na tabela `onecode_messages_raw`.
+## Solucao em duas partes
 
-**Erro:** `there is no unique or exclusion constraint matching the ON CONFLICT specification`
+### 1. Empresas ativas: processar normalmente (criar/atualizar)
 
-O webhook faz `upsert(..., { onConflict: "onecode_message_id" })`, mas a tabela nao tem um indice UNIQUE na coluna `onecode_message_id`.
+Manter o fluxo atual de insert/update apenas para empresas com `Status === "Ativa"`.
 
-Sem mensagens salvas, o scoring por IA nunca e acionado quando o ticket fecha.
+### 2. Empresas inativas: baixar automaticamente no portal
 
-## Solucao
+Quando o sync encontra uma empresa com Status diferente de "Ativa" e ela **ja existe no portal sem `data_baixa`**, preencher `data_baixa` com a data atual, mantendo a lista sincronizada.
 
-### 1. Criar indice UNIQUE na coluna `onecode_message_id`
+Empresas inativas que **nao existem** no portal serao simplesmente ignoradas (nao faz sentido criar uma empresa ja baixada).
 
-```sql
-CREATE UNIQUE INDEX IF NOT EXISTS onecode_messages_raw_onecode_message_id_key 
-ON public.onecode_messages_raw (onecode_message_id);
+### Logica no loop de processamento
+
+```text
+Para cada empresa da API:
+  totalRead++
+  
+  SE status != "Ativa":
+    Buscar no banco por CNPJ
+    SE existe E nao tem data_baixa:
+      UPDATE data_baixa = hoje
+      totalUpdated++
+    SENAO:
+      totalSkipped++
+    continue
+  
+  (fluxo normal de create/update para ativas)
 ```
 
-Isso resolve o upsert e permite que mensagens sejam salvas corretamente.
+### Arquivos modificados
 
-### 2. Reprocessar os 32 eventos pendentes
+**`supabase/functions/sync-acessorias/index.ts`** (funcao principal)
+- Adicionar filtro de status apos `totalRead++`
+- Para inativas existentes no portal: setar `data_baixa`
+- Para inativas sem cadastro: skip
 
-Apos criar o indice, os proximos webhooks funcionarao automaticamente. Mas os 32 eventos ja recebidos estao com `processed = false`. Para reprocessa-los, criaremos uma query que extrai os dados do `payload_json` de cada evento pendente e insere diretamente na `onecode_messages_raw`.
+**`supabase/functions/sync-acessorias-cron/index.ts`** (versao cron)
+- Mesma logica de filtro de status
 
-### 3. Verificacao
+### Impacto
 
-- Confirmar que mensagens Contmax aparecem em `onecode_messages_raw`
-- Confirmar que quando um ticket Contmax fechar, o scoring sera disparado automaticamente (ja esta no codigo do webhook)
-- A pagina Qualidade de Atendimento ja suporta filtro por tenant, entao os scores Contmax aparecerao automaticamente
+- Velocidade: o processamento pesado (hash + 3 queries de busca) so roda para empresas ativas
+- Para inativas, apenas 1 query leve de busca por CNPJ e necessaria (e so quando existe match)
+- A lista do portal ficara sempre sincronizada com o Acessorias: empresas baixadas la serao baixadas aqui automaticamente
+- Nenhuma mudanca no banco de dados (o campo `data_baixa` ja existe na tabela `empresas`)
 
-## Detalhes Tecnicos
+### Detalhes tecnicos
 
-- Nenhuma mudanca no codigo das Edge Functions e necessaria -- o `onecode-webhook` e o `onecode-score-ticket` ja suportam multiplas organizacoes
-- A unica mudanca e no banco de dados: adicionar o indice UNIQUE faltante
-- O reprocessamento dos eventos pendentes sera feito via SQL migration
-
+- O campo `Status` vem em PascalCase da API do Acessorias (confirmado em diagnosticos anteriores)
+- A busca para inativas usa apenas o match por CNPJ formatado (query unica, sem as 3 queries de fallback)
+- O `synced_at` e atualizado tambem nas empresas baixadas para registrar que foram vistas no sync
+- Contadores: inativas baixadas contam como `totalUpdated`, inativas ignoradas contam como `totalSkipped`
