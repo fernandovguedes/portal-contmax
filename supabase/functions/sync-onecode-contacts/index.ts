@@ -134,8 +134,16 @@ Deno.serve(async (req) => {
     }
   }
 
+  let integrationJobId: string | null = null;
+  let tenantIntegrationId: string | null = null;
+  let tenantId: string = "";
+
   try {
-    const { tenant_id } = await req.json();
+    const body = await req.json();
+    tenantId = body.tenant_id;
+    integrationJobId = body.integration_job_id || null;
+    tenantIntegrationId = body.tenant_integration_id || null;
+    const tenant_id = tenantId;
     if (!tenant_id) throw new Error("tenant_id is required");
 
     const onecodeUrl = Deno.env.get("ONECODE_API_URL");
@@ -304,6 +312,7 @@ Deno.serve(async (req) => {
     await admin.from("integration_logs").insert({
       tenant_id,
       integration: "onecode-contacts",
+      provider_slug: "onecode",
       status: "success",
       total_processados: contacts.length,
       total_matched: totalMatched,
@@ -311,6 +320,26 @@ Deno.serve(async (req) => {
       total_ignored: totalIgnored,
       execution_time_ms: executionTime,
     });
+
+    // Finalize integration_job if present
+    if (integrationJobId) {
+      await admin.from("integration_jobs").update({
+        status: "success",
+        progress: 100,
+        finished_at: new Date().toISOString(),
+        execution_time_ms: executionTime,
+        result: { total_processados: contacts.length, total_matched: totalMatched, total_review: totalReview, total_ignored: totalIgnored },
+      }).eq("id", integrationJobId);
+      if (tenantIntegrationId) {
+        await admin.from("tenant_integrations").update({ last_status: "success", last_error: null }).eq("id", tenantIntegrationId);
+      }
+      // Retrigger worker
+      const supabaseUrl2 = Deno.env.get("SUPABASE_URL")!;
+      const srk = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+      fetch(`${supabaseUrl2}/functions/v1/process-integration-job`, {
+        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${srk}` }, body: "{}",
+      }).catch(() => {});
+    }
 
     return new Response(
       JSON.stringify({
@@ -325,23 +354,37 @@ Deno.serve(async (req) => {
     );
   } catch (err: any) {
     const executionTime = Date.now() - startTime;
+    console.error("[sync-onecode-contacts] Error:", err.message);
     try {
-      const body = await req.clone().json().catch(() => ({}));
       await admin.from("integration_logs").insert({
-        tenant_id: (body as any)?.tenant_id || "unknown",
+        tenant_id: tenantId || "unknown",
         integration: "onecode-contacts",
+        provider_slug: "onecode",
         status: "error",
         error_message: err.message,
         execution_time_ms: executionTime,
       });
     } catch (_) {}
 
+    // Finalize integration_job on error
+    if (integrationJobId) {
+      await admin.from("integration_jobs").update({
+        status: "error", progress: 0, error_message: err.message,
+        finished_at: new Date().toISOString(), execution_time_ms: executionTime,
+      }).eq("id", integrationJobId).catch(() => {});
+      if (tenantIntegrationId) {
+        await admin.from("tenant_integrations").update({ last_status: "error", last_error: err.message }).eq("id", tenantIntegrationId).catch(() => {});
+      }
+      const supabaseUrl2 = Deno.env.get("SUPABASE_URL")!;
+      const srk = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+      fetch(`${supabaseUrl2}/functions/v1/process-integration-job`, {
+        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${srk}` }, body: "{}",
+      }).catch(() => {});
+    }
+
     return new Response(
       JSON.stringify({ error: err.message }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
