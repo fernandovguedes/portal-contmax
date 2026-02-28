@@ -24,9 +24,6 @@ verify_jwt = false
 [functions.close-bomcontrole-contracts]
 verify_jwt = false
 
-[functions.sync-onecode-contacts]
-verify_jwt = false
-
 [functions.run-integration]
 verify_jwt = false
 

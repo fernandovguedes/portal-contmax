@@ -14,14 +14,13 @@ import {
   BreadcrumbPage, BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { toast } from "@/hooks/use-toast";
-import { RefreshCw, CheckCircle, XCircle, Users, AlertTriangle, Clock, ArrowLeft } from "lucide-react";
+import { CheckCircle, XCircle, Users, AlertTriangle, Clock, ArrowLeft } from "lucide-react";
 
 export default function OnecodeContacts() {
   const { user } = useAuth();
   const { isAdmin, loading: roleLoading } = useUserRole();
   const navigate = useNavigate();
 
-  const [syncing, setSyncing] = useState(false);
   const [reviews, setReviews] = useState<any[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
   const [metrics, setMetrics] = useState({
@@ -81,30 +80,6 @@ export default function OnecodeContacts() {
         total_review: logData[0].total_review,
         total_ignored: logData[0].total_ignored,
       });
-    }
-  }
-
-  async function handleSync() {
-    if (!tenantId) return;
-    setSyncing(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("sync-onecode-contacts", {
-        body: { tenant_id: tenantId },
-      });
-      if (error) throw error;
-      toast({
-        title: "Sincronização concluída",
-        description: `${data.total_matched} matches, ${data.total_review} para revisão, ${data.total_ignored} ignorados`,
-      });
-      await loadData();
-    } catch (err: any) {
-      toast({
-        title: "Erro na sincronização",
-        description: err.message,
-        variant: "destructive",
-      });
-    } finally {
-      setSyncing(false);
     }
   }
 
@@ -187,10 +162,6 @@ export default function OnecodeContacts() {
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={() => navigate("/admin")}>
               <ArrowLeft className="h-4 w-4 mr-1" /> Voltar
-            </Button>
-            <Button onClick={handleSync} disabled={syncing || !tenantId} size="sm">
-              <RefreshCw className={`h-4 w-4 mr-1 ${syncing ? "animate-spin" : ""}`} />
-              {syncing ? "Sincronizando..." : "Sincronizar Contatos"}
             </Button>
           </div>
         </div>

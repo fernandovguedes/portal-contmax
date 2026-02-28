@@ -9,7 +9,6 @@ const corsHeaders = {
 const FUNCTION_MAP: Record<string, string> = {
   acessorias: "sync-acessorias",
   bomcontrole: "sync-bomcontrole",
-  onecode: "sync-onecode-contacts",
 };
 
 const STALE_RUNNING_MS = 45 * 60 * 1000; // 45 min (sync-acessorias can process 160+ pages across many batches)

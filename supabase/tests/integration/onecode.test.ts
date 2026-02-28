@@ -1,9 +1,8 @@
 /**
- * Integration tests: onecode-webhook & sync-onecode-contacts
+ * Integration tests: onecode-webhook
  *
  * Requires env vars: SUPABASE_URL, SUPABASE_ANON_KEY
  *   + ONECODE_WEBHOOK_SECRET (for webhook tests)
- *   + TEST_ADMIN_JWT (for sync-onecode-contacts)
  * Run: deno task test:integration  (from supabase/ directory)
  */
 
@@ -11,12 +10,7 @@ import {
   assertEquals,
   assert,
   integrationEnvReady,
-  adminEnvReady,
-  postJson,
-  bearerAuth,
   fnUrl,
-  ADMIN_JWT,
-  USER_JWT,
   ONECODE_WEBHOOK_SECRET,
 } from "./_helpers.ts";
 
@@ -91,41 +85,3 @@ Deno.test({
   },
 });
 
-// ─────────────────────────────────────────────────────────────
-// sync-onecode-contacts
-// ─────────────────────────────────────────────────────────────
-
-Deno.test({
-  name: "sync-onecode-contacts — no token → 401",
-  ignore: !integrationEnvReady(),
-  async fn() {
-    const res = await postJson("sync-onecode-contacts", {
-      tenant_id: "00000000-0000-0000-0000-000000000000",
-    });
-    assertEquals(res.status, 401);
-  },
-});
-
-Deno.test({
-  name: "sync-onecode-contacts — non-admin token → 403",
-  ignore: !integrationEnvReady() || !USER_JWT,
-  async fn() {
-    const res = await postJson(
-      "sync-onecode-contacts",
-      { tenant_id: "00000000-0000-0000-0000-000000000000" },
-      bearerAuth(USER_JWT),
-    );
-    assertEquals(res.status, 403);
-  },
-});
-
-Deno.test({
-  name: "sync-onecode-contacts — admin token + missing tenant_id → error",
-  ignore: !adminEnvReady(),
-  async fn() {
-    const res = await postJson("sync-onecode-contacts", {}, bearerAuth(ADMIN_JWT));
-    assert(res.status >= 400, `Expected error status, got ${res.status}`);
-    const body = await res.json();
-    assert(body.error !== undefined, "Expected error field");
-  },
-});
