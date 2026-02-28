@@ -87,7 +87,7 @@ Deno.serve(async (req) => {
     let closeError: string | null = null;
     if (status === "success" && ticketId) {
       try {
-        const closeUrl = `${ONECODE_API_URL}/api/tickets/${ticketId}/send-and-close`;
+        const closeUrl = `${ONECODE_API_URL}/api/tickets/${ticketId}/resolve`;
         const closeRes = await fetch(closeUrl, {
           method: "POST",
           headers: {
