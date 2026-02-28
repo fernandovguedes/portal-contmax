@@ -149,11 +149,16 @@ export function useIntegrationJobs(tenantIds?: string[]) {
       // Trigger the worker to process the pending job.
       // This is a separate call because Supabase Edge Functions cannot reliably
       // do fire-and-forget inter-function calls (Deno kills pending fetches on return).
-      supabase.functions.invoke("process-integration-job", {
+      const { data: prepData, error: prepError } = await supabase.functions.invoke("process-integration-job", {
         body: {},
-      }).catch((err) => {
-        console.error("Failed to trigger worker:", err);
       });
+      if (prepData?.function_name) {
+        supabase.functions.invoke(prepData.function_name, {
+          body: prepData.function_body,
+        }).catch((err) => console.error("Sync function error:", err));
+      } else {
+        console.error("Failed to prepare job:", prepError || prepData);
+      }
 
       // Short delay refetch as fallback if realtime is slow
       setTimeout(() => fetchJobs(), 2000);
