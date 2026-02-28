@@ -33,14 +33,27 @@ serve(async (req) => {
 
     const token = authHeader.replace("Bearer ", "");
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const isServiceRole = token === serviceRoleKey;
+    
+    // Check if service_role by decoding JWT payload
+    let isServiceRole = token === serviceRoleKey;
+    if (!isServiceRole) {
+      try {
+        const payloadB64 = token.split(".")[1];
+        if (payloadB64) {
+          const payload = JSON.parse(atob(payloadB64));
+          if (payload.role === "service_role") {
+            isServiceRole = true;
+          }
+        }
+      } catch (_) { /* not a valid JWT */ }
+    }
 
     if (!isServiceRole) {
       const anonClient = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
         global: { headers: { Authorization: authHeader } },
       });
-      const { error: claimsError } = await anonClient.auth.getClaims(token);
-      if (claimsError) {
+      const { data: userData, error: userError } = await anonClient.auth.getUser();
+      if (userError || !userData?.user) {
         return jsonResp({ error: "Unauthorized" }, 401);
       }
     }
@@ -76,7 +89,7 @@ serve(async (req) => {
         score_final: null,
         feedback: "Ticket de grupo — ignorado na avaliação de qualidade.",
         model_used: "skipped",
-        organizacao_id: organizacaoId || "00000000-0000-0000-0000-000000000000",
+        organizacao_id: organizacaoId || null,
       };
       const { data: saved, error: saveErr } = await supabase
         .from("onecode_ticket_scores")
@@ -104,7 +117,7 @@ serve(async (req) => {
         score_final: null,
         feedback: "Ticket sem interação de atendente humano — ignorado.",
         model_used: "skipped",
-        organizacao_id: organizacaoId || "00000000-0000-0000-0000-000000000000",
+        organizacao_id: organizacaoId || null,
       };
       const { data: saved, error: saveErr } = await supabase
         .from("onecode_ticket_scores")
@@ -131,7 +144,7 @@ serve(async (req) => {
         score_final: null,
         feedback: `Mensagens insuficientes para avaliação (${messages?.length ?? 0} mensagens encontradas).`,
         model_used: "skipped",
-        organizacao_id: organizacaoId || "00000000-0000-0000-0000-000000000000",
+        organizacao_id: organizacaoId || null,
       };
       const { data: saved, error: saveErr } = await supabase
         .from("onecode_ticket_scores")
