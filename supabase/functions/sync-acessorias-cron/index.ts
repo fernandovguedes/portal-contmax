@@ -86,7 +86,45 @@ async function runSync(
       for (const company of companies) {
         c.totalRead++;
         try {
-          const rawKey = company.cnpj || company.cpf || company.identificador || company.document || "";
+          const rawKey = company.Identificador || company.cnpj || company.cpf || company.identificador || company.document || "";
+
+          // --- Filter: only process active companies fully ---
+          const companyStatus = company.Status || company.status || "";
+          if (companyStatus && companyStatus !== "Ativa") {
+            // Inactive company: check if it exists in portal without data_baixa
+            if (rawKey) {
+              const formattedKeyInactive = formatCnpj(rawKey);
+              const { data: existingInactive } = await supabase
+                .from("empresas")
+                .select("id, data_baixa")
+                .eq("organizacao_id", tenantId)
+                .eq("cnpj", formattedKeyInactive)
+                .maybeSingle();
+
+              if (existingInactive && !existingInactive.data_baixa) {
+                const { error: baixaErr } = await supabase
+                  .from("empresas")
+                  .update({
+                    data_baixa: new Date().toISOString().slice(0, 10),
+                    synced_at: new Date().toISOString(),
+                  })
+                  .eq("id", existingInactive.id);
+                if (baixaErr) {
+                  await logEntry("error", `Baixa failed: ${formattedKeyInactive}`, { error: baixaErr.message });
+                  c.totalErrors++;
+                } else {
+                  await logEntry("info", `Empresa baixada automaticamente: ${formattedKeyInactive} (Status: ${companyStatus})`);
+                  c.totalUpdated++;
+                }
+              } else {
+                c.totalSkipped++;
+              }
+            } else {
+              c.totalSkipped++;
+            }
+            continue;
+          }
+          // --- End filter ---
           if (!rawKey) {
             await logEntry("warning", "Empresa sem CNPJ/CPF, ignorada", { company });
             c.totalSkipped++;
@@ -94,7 +132,7 @@ async function runSync(
           }
 
           const formattedKey = formatCnpj(rawKey);
-          const nome = company.razaoSocial || company.razao_social || company.nome || company.name || "Sem nome";
+          const nome = company.Razao || company.razaoSocial || company.razao_social || company.Fantasia || company.nome || company.name || "Sem nome";
           const sortedJson = JSON.stringify(company, Object.keys(company).sort());
           const hash = await sha256(sortedJson);
 
