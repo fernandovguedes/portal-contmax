@@ -1,27 +1,41 @@
 
 
-## Redefinir senha diretamente via Edge Function
+# Fix: Replicar fluxo OneCode para Contmax
 
-Como os links de reset do Supabase nao estao funcionando (erro "Email link is invalid or has expired" nos logs), vou criar uma edge function temporaria para definir sua senha sem precisar de autenticacao.
+## Problema Identificado
 
-### Passo 1: Criar edge function temporaria
-Criar `set-password-noauth` que usa uma chave secreta interna (SUPABASE_SERVICE_ROLE_KEY) para atualizar a senha do usuario diretamente, sem exigir login.
+O fluxo ja esta configurado para Contmax no webhook (header `x-onecode-source: contmax`), e o webhook JA recebe eventos (35 ate agora). Porem, **todas as 32 mensagens falham** ao serem salvas na tabela `onecode_messages_raw`.
 
-### Passo 2: Coletar sua senha
-Vou pedir que voce informe a senha desejada no chat. A funcao vai atualizar a senha do usuario `6a53df87-dbd5-46b3-bf52-1febeafb2312` (fernandov.guedes@gmail.com).
+**Erro:** `there is no unique or exclusion constraint matching the ON CONFLICT specification`
 
-### Passo 3: Chamar a funcao e definir a senha
-Executar a edge function para aplicar a nova senha.
+O webhook faz `upsert(..., { onConflict: "onecode_message_id" })`, mas a tabela nao tem um indice UNIQUE na coluna `onecode_message_id`.
 
-### Passo 4: Limpar
-Remover a edge function temporaria apos uso, por seguranca.
+Sem mensagens salvas, o scoring por IA nunca e acionado quando o ticket fecha.
 
-### Detalhes Tecnicos
+## Solucao
 
-A edge function `set-password-noauth/index.ts`:
-- Aceita POST com `{ "password": "...", "secret": "..." }`
-- Valida um token secreto hardcoded para evitar uso indevido
-- Usa `supabase.auth.admin.updateUserById()` com o service role key
-- Atualiza a senha do user_id fixo (`6a53df87...`)
-- Sera deletada apos o uso
+### 1. Criar indice UNIQUE na coluna `onecode_message_id`
+
+```sql
+CREATE UNIQUE INDEX IF NOT EXISTS onecode_messages_raw_onecode_message_id_key 
+ON public.onecode_messages_raw (onecode_message_id);
+```
+
+Isso resolve o upsert e permite que mensagens sejam salvas corretamente.
+
+### 2. Reprocessar os 32 eventos pendentes
+
+Apos criar o indice, os proximos webhooks funcionarao automaticamente. Mas os 32 eventos ja recebidos estao com `processed = false`. Para reprocessa-los, criaremos uma query que extrai os dados do `payload_json` de cada evento pendente e insere diretamente na `onecode_messages_raw`.
+
+### 3. Verificacao
+
+- Confirmar que mensagens Contmax aparecem em `onecode_messages_raw`
+- Confirmar que quando um ticket Contmax fechar, o scoring sera disparado automaticamente (ja esta no codigo do webhook)
+- A pagina Qualidade de Atendimento ja suporta filtro por tenant, entao os scores Contmax aparecerao automaticamente
+
+## Detalhes Tecnicos
+
+- Nenhuma mudanca no codigo das Edge Functions e necessaria -- o `onecode-webhook` e o `onecode-score-ticket` ja suportam multiplas organizacoes
+- A unica mudanca e no banco de dados: adicionar o indice UNIQUE faltante
+- O reprocessamento dos eventos pendentes sera feito via SQL migration
 
