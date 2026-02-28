@@ -124,16 +124,16 @@ async function processBatch(
     const samplesToLog = Math.min(3, companies.length);
     for (let i = 0; i < samplesToLog; i++) {
       const company = companies[i];
-      const rawKey = company.cnpj || company.cpf || company.identificador || company.document || "";
+      const rawKey = company.Identificador || company.cnpj || company.cpf || company.identificador || company.document || "";
       const digits = rawKey.replace(/\D/g, "");
       const formattedKey = formatCnpj(rawKey);
-      console.log(`[sync-acessorias] DIAG company[${i}]: rawKey="${rawKey}" digits="${digits}" formattedKey="${formattedKey}" nome="${company.razaoSocial || company.nome || "?"}" keys=${Object.keys(company).join(",")}`);
+      console.log(`[sync-acessorias] DIAG company[${i}]: rawKey="${rawKey}" digits="${digits}" formattedKey="${formattedKey}" nome="${company.Razao || company.razaoSocial || company.nome || "?"}" keys=${Object.keys(company).join(",")}`);
     }
 
     for (const company of companies) {
       c.totalRead++;
       try {
-        const rawKey = company.cnpj || company.cpf || company.identificador || company.document || "";
+        const rawKey = company.Identificador || company.cnpj || company.cpf || company.identificador || company.document || "";
         if (!rawKey) {
           await logEntry("warning", "Empresa sem CNPJ/CPF, ignorada", { company });
           c.totalSkipped++;
@@ -142,7 +142,7 @@ async function processBatch(
 
         const formattedKey = formatCnpj(rawKey);
         const digitsOnly = rawKey.replace(/\D/g, "");
-        const nome = company.razaoSocial || company.razao_social || company.nome || company.name || "Sem nome";
+        const nome = company.Razao || company.razaoSocial || company.razao_social || company.Fantasia || company.nome || company.name || "Sem nome";
         const sortedJson = JSON.stringify(company, Object.keys(company).sort());
         const hash = await sha256(sortedJson);
 
