@@ -13,15 +13,16 @@ Deno.serve(async (req) => {
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    // Call the main sync-bomcontrole function with sync_payments action
+    // Call the main sync-bomcontrole function with sync_payments action.
+    // Must use service role key — sync-bomcontrole now requires service role or admin JWT.
     const res = await fetch(
       `${supabaseUrl}/functions/v1/sync-bomcontrole?action=sync_payments&tenant_id=contmax`,
       {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${anonKey}`,
+          Authorization: `Bearer ${serviceRoleKey}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ action: "sync_payments", tenant_id: "contmax" }),

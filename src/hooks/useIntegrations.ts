@@ -129,29 +129,50 @@ export function useIntegrationLogs(tenantId?: string, providerSlug?: string, lim
   const [logs, setLogs] = useState<IntegrationLog[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const fetchLogs = useCallback(async () => {
     if (!user) {
       setLoading(false);
       return;
     }
 
-    const fetchLogs = async () => {
-      let query = supabase
-        .from("integration_logs")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(limit);
+    let query = supabase
+      .from("integration_logs")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(limit);
 
-      if (tenantId) query = query.eq("tenant_id", tenantId);
-      if (providerSlug) query = query.eq("integration", providerSlug);
+    if (tenantId) query = query.eq("tenant_id", tenantId);
+    if (providerSlug) query = query.eq("integration", providerSlug);
 
-      const { data } = await query;
-      setLogs((data ?? []) as IntegrationLog[]);
+    const { data, error } = await query;
+    if (error) {
+      toast({ title: "Erro ao carregar logs de integração", description: error.message, variant: "destructive" });
       setLoading(false);
-    };
-
-    fetchLogs();
+      return;
+    }
+    setLogs((data ?? []) as IntegrationLog[]);
+    setLoading(false);
   }, [user, tenantId, providerSlug, limit]);
 
-  return { logs, loading };
+  useEffect(() => {
+    fetchLogs();
+
+    if (!tenantId) return;
+
+    const channel = supabase
+      .channel(`int_logs_${tenantId}_${providerSlug ?? "all"}`)
+      .on("postgres_changes", {
+        event: "*",
+        schema: "public",
+        table: "integration_logs",
+        filter: `tenant_id=eq.${tenantId}`,
+      }, () => {
+        fetchLogs();
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [fetchLogs, tenantId, providerSlug]);
+
+  return { logs, loading, refetch: fetchLogs };
 }

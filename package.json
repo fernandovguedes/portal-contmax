@@ -10,7 +10,10 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:functions:unit": "cd supabase && deno task test:unit",
+    "test:functions:integration": "cd supabase && deno task test:integration",
+    "test:functions": "cd supabase && deno task test"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

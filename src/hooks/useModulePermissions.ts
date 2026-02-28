@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
+import { toast } from "@/hooks/use-toast";
 
 export function useModulePermissions(moduleSlug: string = "controle-fiscal") {
   const { user } = useAuth();
@@ -25,13 +26,18 @@ export function useModulePermissions(moduleSlug: string = "controle-fiscal") {
     }
 
     const fetch = async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("user_modules")
         .select("can_edit, modules!inner(slug)")
         .eq("user_id", user.id)
         .eq("modules.slug", moduleSlug)
         .maybeSingle();
 
+      if (error) {
+        toast({ title: "Erro ao verificar permissões do módulo", description: error.message, variant: "destructive" });
+        setLoading(false);
+        return;
+      }
       setCanEdit(!!(data as any)?.can_edit);
       setLoading(false);
     };

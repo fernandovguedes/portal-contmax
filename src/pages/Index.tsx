@@ -42,7 +42,11 @@ const Index = () => {
       .select("organizacao_id")
       .eq("slug", "controle-fiscal")
       .single()
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        if (error) {
+          toast({ title: "Erro ao carregar módulo", description: error.message, variant: "destructive" });
+          return;
+        }
         if (data?.organizacao_id) setOrganizacaoId(data.organizacao_id);
       });
   }, []);

@@ -1,0 +1,7 @@
+{
+  "tasks": {
+    "test:unit": "deno test tests/unit/ --allow-env",
+    "test:integration": "deno test tests/integration/ --allow-env --allow-net",
+    "test": "deno test tests/ --allow-env --allow-net"
+  }
+}

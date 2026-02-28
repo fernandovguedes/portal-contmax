@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { toast } from "@/hooks/use-toast";
 
 export function useUserRole() {
   const { user } = useAuth();
@@ -15,13 +16,18 @@ export function useUserRole() {
     }
 
     const fetchRole = async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("user_roles")
         .select("role")
         .eq("user_id", user.id)
         .eq("role", "admin")
         .maybeSingle();
 
+      if (error) {
+        toast({ title: "Erro ao verificar permissões", description: error.message, variant: "destructive" });
+        setLoading(false);
+        return;
+      }
       setIsAdmin(!!data);
       setLoading(false);
     };

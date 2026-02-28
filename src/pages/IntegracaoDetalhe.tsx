@@ -11,10 +11,13 @@ import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Play, CheckCircle, XCircle, Clock, Activity, Loader2 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Pagination, PaginationContent, PaginationItem, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
+import { Play, CheckCircle, XCircle, Clock, Activity, Loader2, ScrollText } from "lucide-react";
 import { formatDistanceToNow, format, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
 const STATUS_BADGE: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
@@ -24,6 +27,16 @@ const STATUS_BADGE: Record<string, { label: string; variant: "default" | "second
   error: { label: "Erro", variant: "destructive" },
   canceled: { label: "Cancelado", variant: "outline" },
 };
+
+const PAGE_SIZE = 20;
+
+function formatDuration(ms: number | null): string {
+  if (!ms || ms <= 0) return "—";
+  if (ms < 1000) return `${ms}ms`;
+  const secs = Math.floor(ms / 1000);
+  if (secs < 60) return `${secs}s`;
+  return `${Math.floor(secs / 60)}m ${secs % 60}s`;
+}
 
 export default function IntegracaoDetalhe() {
   const { slug } = useParams<{ slug: string }>();
@@ -36,14 +49,27 @@ export default function IntegracaoDetalhe() {
   const { logs, loading: logsLoading } = useIntegrationLogs(tenantId, slug, 100);
   const { getActiveJob, getJobsByProvider, submitJob, loading: jobsLoading } = useIntegrationJobs();
 
+  const [logStatus, setLogStatus] = useState<string>("all");
+  const [logPeriod, setLogPeriod] = useState<number>(30);
+  const [logPage, setLogPage] = useState<number>(1);
+
   const integration = integrations.find(
     (i) => (i.providerData?.slug ?? i.provider) === slug
   );
 
   const userName = user?.user_metadata?.nome || user?.email?.split("@")[0] || "";
 
-  const activeJob = integration ? getActiveJob(integration.tenant_id, slug!) : undefined;
-  const providerJobs = integration ? getJobsByProvider(integration.tenant_id, slug!) : [];
+  if (!slug) {
+    return (
+      <div className="min-h-screen bg-background">
+        <AppHeader title="Integração não encontrada" showBack backTo="/integracoes" />
+        <div className="text-center py-20 text-muted-foreground">Parâmetro de integração ausente.</div>
+      </div>
+    );
+  }
+
+  const activeJob = integration ? getActiveJob(integration.tenant_id, slug) : undefined;
+  const providerJobs = integration ? getJobsByProvider(integration.tenant_id, slug) : [];
 
   // Metrics
   const metrics = useMemo(() => {
@@ -76,6 +102,21 @@ export default function IntegracaoDetalhe() {
       chartData: Array.from(dailyMap.entries()).map(([date, v]) => ({ date, ...v })),
     };
   }, [logs]);
+
+  const filteredLogs = useMemo(() => {
+    const cutoff =
+      logPeriod === 1
+        ? new Date(new Date().setHours(0, 0, 0, 0))
+        : new Date(Date.now() - logPeriod * 24 * 60 * 60 * 1000);
+    return logs.filter((l) => {
+      if (logStatus !== "all" && l.status !== logStatus) return false;
+      if (new Date(l.created_at) < cutoff) return false;
+      return true;
+    });
+  }, [logs, logStatus, logPeriod]);
+
+  const totalLogPages = Math.max(1, Math.ceil(filteredLogs.length / PAGE_SIZE));
+  const pagedLogs = filteredLogs.slice((logPage - 1) * PAGE_SIZE, logPage * PAGE_SIZE);
 
   if (loading || logsLoading || jobsLoading) return <LoadingSkeleton variant="portal" />;
 
@@ -371,6 +412,141 @@ export default function IntegracaoDetalhe() {
             </Card>
           </TabsContent>
         </Tabs>
+        {/* ─── Histórico de Execuções ─────────────────────────────── */}
+        <Card>
+          <CardHeader>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <ScrollText className="h-4 w-4" />
+                Histórico de Execuções
+              </CardTitle>
+              <div className="flex flex-wrap gap-2">
+                <Select
+                  value={logStatus}
+                  onValueChange={(v) => { setLogStatus(v); setLogPage(1); }}
+                >
+                  <SelectTrigger className="h-8 w-40 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os status</SelectItem>
+                    <SelectItem value="success">Sucesso</SelectItem>
+                    <SelectItem value="error">Erro</SelectItem>
+                    <SelectItem value="running">Em andamento</SelectItem>
+                    <SelectItem value="pending">Na fila</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Select
+                  value={String(logPeriod)}
+                  onValueChange={(v) => { setLogPeriod(Number(v)); setLogPage(1); }}
+                >
+                  <SelectTrigger className="h-8 w-40 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">Hoje</SelectItem>
+                    <SelectItem value="7">Últimos 7 dias</SelectItem>
+                    <SelectItem value="30">Últimos 30 dias</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {pagedLogs.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 gap-3 text-muted-foreground">
+                <ScrollText className="h-10 w-10 opacity-30" />
+                <p className="text-sm">Nenhuma execução encontrada para os filtros selecionados.</p>
+              </div>
+            ) : (
+              <>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-28">Status</TableHead>
+                        <TableHead className="w-44">Início</TableHead>
+                        <TableHead className="w-24">Duração</TableHead>
+                        <TableHead className="w-24 text-right">Registros</TableHead>
+                        <TableHead>Mensagem</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {pagedLogs.map((log) => {
+                        const st = STATUS_BADGE[log.status] ?? { label: log.status, variant: "outline" as const };
+                        const msg = log.error_message ?? "";
+                        const isActive = log.status === "running" || log.status === "pending";
+                        return (
+                          <TableRow key={log.id}>
+                            <TableCell>
+                              <Badge variant={st.variant} className="text-xs">
+                                {isActive && <Loader2 className="h-2.5 w-2.5 mr-1 animate-spin" />}
+                                {st.label}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-xs whitespace-nowrap tabular-nums">
+                              {format(new Date(log.created_at), "dd/MM/yyyy HH:mm:ss", { locale: ptBR })}
+                            </TableCell>
+                            <TableCell className="text-xs tabular-nums">
+                              {formatDuration(log.execution_time_ms)}
+                            </TableCell>
+                            <TableCell className="text-right text-xs tabular-nums">
+                              {log.total_processados ?? "—"}
+                            </TableCell>
+                            <TableCell className="text-xs max-w-[260px]">
+                              {msg.length > 80 ? (
+                                <TooltipProvider delayDuration={200}>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span className="block truncate cursor-help text-destructive">
+                                        {msg.slice(0, 80)}…
+                                      </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent className="max-w-sm break-words">
+                                      {msg}
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              ) : (
+                                <span className={msg ? "text-destructive" : "text-muted-foreground"}>
+                                  {msg || "—"}
+                                </span>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                <div className="flex items-center justify-between mt-4 pt-3 border-t">
+                  <p className="text-xs text-muted-foreground">
+                    {filteredLogs.length} resultado{filteredLogs.length !== 1 ? "s" : ""}
+                    {" · "}página {logPage} de {totalLogPages}
+                  </p>
+                  <Pagination className="w-auto mx-0 justify-end">
+                    <PaginationContent>
+                      <PaginationItem>
+                        <PaginationPrevious
+                          onClick={() => setLogPage((p) => Math.max(1, p - 1))}
+                          className={logPage === 1 ? "pointer-events-none opacity-40" : "cursor-pointer"}
+                        />
+                      </PaginationItem>
+                      <PaginationItem>
+                        <PaginationNext
+                          onClick={() => setLogPage((p) => Math.min(totalLogPages, p + 1))}
+                          className={logPage === totalLogPages ? "pointer-events-none opacity-40" : "cursor-pointer"}
+                        />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
       </main>
     </div>
   );

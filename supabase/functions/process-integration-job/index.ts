@@ -9,7 +9,6 @@ const corsHeaders = {
 const FUNCTION_MAP: Record<string, string> = {
   acessorias: "sync-acessorias",
   bomcontrole: "sync-bomcontrole",
-  onecode: "sync-onecode-contacts",
 };
 
 const STALE_RUNNING_MS = 45 * 60 * 1000; // 45 min (sync-acessorias can process 160+ pages across many batches)
@@ -22,6 +21,24 @@ Deno.serve(async (req) => {
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+  // Auth: internal-only worker — rejects any call that does not carry the service role key.
+  // This function is never called directly by end-users; callers are run-integration,
+  // sync-acessorias (retrigger) and self-invocation, all of which pass the service role key.
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader?.startsWith("Bearer ")) {
+    return new Response(
+      JSON.stringify({ error: "Unauthorized", detail: "Missing Authorization header" }),
+      { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
+  if (authHeader.replace("Bearer ", "") !== serviceRoleKey) {
+    return new Response(
+      JSON.stringify({ error: "Unauthorized", detail: "This function is internal and requires the service role key" }),
+      { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
+
   const admin = createClient(supabaseUrl, serviceRoleKey);
 
   try {
