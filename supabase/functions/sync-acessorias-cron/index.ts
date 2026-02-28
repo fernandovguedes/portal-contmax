@@ -19,7 +19,7 @@ interface SyncCounters {
 }
 
 async function updateJobProgress(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   jobId: string,
   counters: SyncCounters,
 ) {
@@ -33,7 +33,7 @@ async function updateJobProgress(
 }
 
 async function runSync(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   jobId: string,
   tenantId: string,
   tenantSlug: string,
@@ -230,7 +230,7 @@ async function runSync(
 }
 
 async function processTenant(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   tenantSlug: string,
 ): Promise<{ status: string; job_id?: string; reason?: string }> {
   console.log(`[sync-cron] Processing tenant: ${tenantSlug}`);

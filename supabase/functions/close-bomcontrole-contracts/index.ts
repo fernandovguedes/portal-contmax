@@ -72,7 +72,7 @@ function hasPaidFutureInvoice(faturas: any[], competenciaCorte: string): boolean
   });
 }
 
-async function fetchAllContracts(supabase: ReturnType<typeof createClient>, tenantId: string, offset: number) {
+async function fetchAllContracts(supabase: any, tenantId: string, offset: number) {
   const from = offset;
   const to = offset + BATCH_SIZE - 1;
   const { data, error } = await supabase

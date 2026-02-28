@@ -18,7 +18,7 @@ import { Play, CheckCircle, XCircle, Clock, Activity, Loader2, ScrollText } from
 import { formatDistanceToNow, format, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useMemo, useState } from "react";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
 const STATUS_BADGE: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   success: { label: "Sucesso", variant: "default" },
@@ -272,7 +272,7 @@ export default function IntegracaoDetalhe() {
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                     <XAxis dataKey="date" tick={{ fontSize: 10 }} />
                     <YAxis allowDecimals={false} tick={{ fontSize: 10 }} />
-                    <Tooltip />
+                    <RechartsTooltip />
                     <Bar dataKey="success" name="Sucesso" fill="hsl(var(--primary))" radius={[3, 3, 0, 0]} />
                     <Bar dataKey="error" name="Erro" fill="hsl(var(--destructive))" radius={[3, 3, 0, 0]} />
                   </BarChart>
