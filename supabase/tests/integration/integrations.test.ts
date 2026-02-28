@@ -112,20 +112,100 @@ Deno.test({
 });
 
 // ─────────────────────────────────────────────────────────────
-// process-integration-job
+// process-integration-job (now requires service role key)
 // ─────────────────────────────────────────────────────────────
 
 Deno.test({
-  name: "process-integration-job — no token → error or 'no pending jobs'",
+  name: "process-integration-job — no token → 401",
   ignore: !integrationEnvReady(),
   async fn() {
     const res = await postJson("process-integration-job", {});
-    // This function uses service role key internally.
-    // Without it, it may return 401 or attempt to process with no jobs.
+    assertEquals(res.status, 401);
     const body = await res.json();
-    assert(
-      res.status === 401 || body.message === "No pending jobs" || body.status === "delegated",
-      `Unexpected response: ${res.status} ${JSON.stringify(body)}`,
+    assert(body.error !== undefined, "Expected error field");
+  },
+});
+
+Deno.test({
+  name: "process-integration-job — invalid token → 401",
+  ignore: !integrationEnvReady(),
+  async fn() {
+    const res = await postJson("process-integration-job", {}, bearerAuth("not.a.valid.jwt"));
+    assertEquals(res.status, 401);
+    const body = await res.json();
+    assert(body.error !== undefined, "Expected error field");
+  },
+});
+
+Deno.test({
+  name: "process-integration-job — admin JWT (non-service-role) → 401",
+  ignore: !adminEnvReady(),
+  async fn() {
+    // Even admins cannot call this internal function — only service role key is accepted.
+    const res = await postJson("process-integration-job", {}, bearerAuth(ADMIN_JWT));
+    assertEquals(res.status, 401);
+    const body = await res.json();
+    assert(body.detail?.includes("service role"), `Expected service role detail, got: ${body.detail}`);
+  },
+});
+
+// ─────────────────────────────────────────────────────────────
+// sync-bomcontrole (now requires service role or admin JWT)
+// ─────────────────────────────────────────────────────────────
+
+Deno.test({
+  name: "sync-bomcontrole — no token → 401",
+  ignore: !integrationEnvReady(),
+  async fn() {
+    const res = await postJson("sync-bomcontrole", {
+      action: "sync_values",
+      tenant_id: "contmax",
+      competencia: "2026-01",
+      items: [],
+    });
+    assertEquals(res.status, 401);
+  },
+});
+
+Deno.test({
+  name: "sync-bomcontrole — invalid token → 401",
+  ignore: !integrationEnvReady(),
+  async fn() {
+    const res = await postJson(
+      "sync-bomcontrole",
+      { action: "sync_values", tenant_id: "contmax", competencia: "2026-01", items: [] },
+      bearerAuth("invalid.token"),
     );
+    assertEquals(res.status, 401);
+  },
+});
+
+// ─────────────────────────────────────────────────────────────
+// close-bomcontrole-contracts (now requires service role or admin JWT)
+// ─────────────────────────────────────────────────────────────
+
+Deno.test({
+  name: "close-bomcontrole-contracts — no token → 401",
+  ignore: !integrationEnvReady(),
+  async fn() {
+    const res = await postJson("close-bomcontrole-contracts", {
+      tenant_id: "contmax",
+      competencia_corte: "2026-01",
+      execute: false,
+    });
+    assertEquals(res.status, 401);
+  },
+});
+
+Deno.test({
+  name: "close-bomcontrole-contracts — invalid token → 401",
+  ignore: !integrationEnvReady(),
+  async fn() {
+    const res = await postJson(
+      "close-bomcontrole-contracts",
+      { tenant_id: "contmax", competencia_corte: "2026-01", execute: false },
+      bearerAuth("bad.token"),
+    );
+    assertEquals(res.status, 401);
   },
 });
