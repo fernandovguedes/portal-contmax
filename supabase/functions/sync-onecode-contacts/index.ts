@@ -87,6 +87,7 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  console.log("[sync-onecode-contacts] POST /sync-onecode-contacts");
   const startTime = Date.now();
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -146,10 +147,13 @@ Deno.serve(async (req) => {
     const tenant_id = tenantId;
     if (!tenant_id) throw new Error("tenant_id is required");
 
+    console.log(`[sync-onecode-contacts] tenant=${tenant_id}, job=${integrationJobId}, ti=${tenantIntegrationId}`);
+
     const onecodeUrl = Deno.env.get("ONECODE_API_URL");
     const onecodeToken = Deno.env.get("ONECODE_API_TOKEN");
     if (!onecodeUrl || !onecodeToken) throw new Error("OneCode secrets not configured");
 
+    console.log(`[sync-onecode-contacts] Fetching contacts from OneCode API...`);
     // Fetch contacts from OneCode
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 25000);
@@ -170,6 +174,7 @@ Deno.serve(async (req) => {
     }
     const contactsBody = await contactsRes.json();
     const contacts: any[] = contactsBody.data || contactsBody.contacts || contactsBody || [];
+    console.log(`[sync-onecode-contacts] Got ${contacts.length} contacts from API`);
 
     // Fetch companies for tenant
     const { data: companies, error: compErr } = await admin
