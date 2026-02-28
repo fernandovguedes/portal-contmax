@@ -6,6 +6,23 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// Tenant config: maps organizacao_id to OneCode credentials env vars
+const CONTMAX_ORG_ID = "d84e2150-0ae0-4462-880c-da8cec89e96a";
+const PG_ORG_ID = "30e6da4c-ed58-47ce-8a83-289b58ca15ab";
+
+function getOneCodeConfig(organizacaoId: string): { url: string; token: string } | null {
+  if (organizacaoId === CONTMAX_ORG_ID) {
+    const url = Deno.env.get("ONECODE_API_URL_CONTMAX");
+    const token = Deno.env.get("ONECODE_API_TOKEN_CONTMAX");
+    if (url && token) return { url, token };
+  }
+  // P&G or default
+  const url = Deno.env.get("ONECODE_API_URL");
+  const token = Deno.env.get("ONECODE_API_TOKEN");
+  if (url && token) return { url, token };
+  return null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -44,17 +61,32 @@ Deno.serve(async (req) => {
       });
     }
 
-    const ONECODE_API_URL = Deno.env.get("ONECODE_API_URL");
-    const ONECODE_API_TOKEN = Deno.env.get("ONECODE_API_TOKEN");
+    // Detect tenant from empresa_id
+    const serviceClient = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
 
-    if (!ONECODE_API_URL || !ONECODE_API_TOKEN) {
-      return new Response(JSON.stringify({ error: "OneCode API not configured" }), {
+    const { data: empresa } = await serviceClient
+      .from("empresas")
+      .select("organizacao_id")
+      .eq("id", empresa_id)
+      .single();
+
+    const organizacaoId = empresa?.organizacao_id || PG_ORG_ID;
+    const oneCodeConfig = getOneCodeConfig(organizacaoId);
+
+    if (!oneCodeConfig) {
+      return new Response(JSON.stringify({ error: "OneCode API not configured for this tenant" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
+    const { url: ONECODE_API_URL, token: ONECODE_API_TOKEN } = oneCodeConfig;
     const oneCodeUrl = `${ONECODE_API_URL}/api/send/${to}`;
+
+    console.log("Sending WhatsApp via", organizacaoId === CONTMAX_ORG_ID ? "CONTMAX" : "PG", "to", to);
 
     let status = "success";
     let ticketId: string | null = null;
@@ -76,7 +108,7 @@ Deno.serve(async (req) => {
       if (!oneCodeRes.ok) {
         status = "error";
       } else {
-      ticketId = responseRaw?.ticketId || responseRaw?.ticket_id || responseRaw?.message?.ticketId || null;
+        ticketId = responseRaw?.ticketId || responseRaw?.ticket_id || responseRaw?.message?.ticketId || null;
       }
     } catch (fetchErr) {
       status = "error";
@@ -106,11 +138,6 @@ Deno.serve(async (req) => {
     }
 
     // Log to whatsapp_logs
-    const serviceClient = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
-
     await serviceClient.from("whatsapp_logs").insert({
       empresa_id,
       to,
