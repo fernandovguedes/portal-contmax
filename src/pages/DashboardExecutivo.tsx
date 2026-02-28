@@ -25,6 +25,7 @@ import {
 } from "recharts";
 import { Building2, TrendingUp, UserPlus, LayoutDashboard } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
 
 const ORGS = [
   { value: "all", label: "Todas" },
@@ -69,6 +70,7 @@ function formatMonthLabel(key: string) {
 
 export default function DashboardExecutivo() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [orgId, setOrgId] = useState("all");
   const [empresas, setEmpresas] = useState<EmpresaLight[]>([]);
   const [loading, setLoading] = useState(true);
@@ -84,7 +86,12 @@ export default function DashboardExecutivo() {
         query = query.eq("organizacao_id", orgId);
       }
 
-      const { data } = await query;
+      const { data, error } = await query;
+      if (error) {
+        toast({ title: "Erro ao carregar dados", description: error.message, variant: "destructive" });
+        setLoading(false);
+        return;
+      }
       setEmpresas((data as EmpresaLight[]) ?? []);
       setLoading(false);
     };

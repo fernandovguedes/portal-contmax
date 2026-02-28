@@ -145,7 +145,12 @@ export function useIntegrationLogs(tenantId?: string, providerSlug?: string, lim
       if (tenantId) query = query.eq("tenant_id", tenantId);
       if (providerSlug) query = query.eq("integration", providerSlug);
 
-      const { data } = await query;
+      const { data, error } = await query;
+      if (error) {
+        toast({ title: "Erro ao carregar logs de integração", description: error.message, variant: "destructive" });
+        setLoading(false);
+        return;
+      }
       setLogs((data ?? []) as IntegrationLog[]);
       setLoading(false);
     };

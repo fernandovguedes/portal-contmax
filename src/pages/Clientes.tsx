@@ -30,11 +30,13 @@ import { AppHeader } from "@/components/AppHeader";
 import { LoadingSkeleton } from "@/components/LoadingSkeleton";
 import { SyncPanel } from "@/components/SyncPanel";
 import { useUserRole } from "@/hooks/useUserRole";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Clientes() {
   const navigate = useNavigate();
   const { orgSlug } = useParams<{ orgSlug: string }>();
   const { canEdit } = useModulePermissions(`clientes-${orgSlug}`);
+  const { toast } = useToast();
 
   const [orgInfo, setOrgInfo] = useState<{ id: string; nome: string } | null>(null);
   useEffect(() => {
@@ -44,7 +46,11 @@ export default function Clientes() {
       .select("id, nome")
       .eq("slug", orgSlug)
       .single()
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        if (error) {
+          toast({ title: "Erro ao carregar organização", description: error.message, variant: "destructive" });
+          return;
+        }
         if (data) setOrgInfo(data);
       });
   }, [orgSlug]);

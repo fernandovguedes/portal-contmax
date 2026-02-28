@@ -42,8 +42,17 @@ export default function IntegracaoDetalhe() {
 
   const userName = user?.user_metadata?.nome || user?.email?.split("@")[0] || "";
 
-  const activeJob = integration ? getActiveJob(integration.tenant_id, slug!) : undefined;
-  const providerJobs = integration ? getJobsByProvider(integration.tenant_id, slug!) : [];
+  if (!slug) {
+    return (
+      <div className="min-h-screen bg-background">
+        <AppHeader title="Integração não encontrada" showBack backTo="/integracoes" />
+        <div className="text-center py-20 text-muted-foreground">Parâmetro de integração ausente.</div>
+      </div>
+    );
+  }
+
+  const activeJob = integration ? getActiveJob(integration.tenant_id, slug) : undefined;
+  const providerJobs = integration ? getJobsByProvider(integration.tenant_id, slug) : [];
 
   // Metrics
   const metrics = useMemo(() => {
