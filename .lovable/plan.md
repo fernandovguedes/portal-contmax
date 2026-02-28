@@ -1,60 +1,24 @@
 
-# Filtrar empresas ativas + Baixar inativas automaticamente
 
-## Problema atual
+# Fix: Erros de build nas Edge Functions
 
-O sync do Acessorias processa ~38.000 empresas (1.900+ paginas), incluindo inativas. Isso e lento e desnecessario. Alem disso, quando uma empresa e baixada no Acessorias, o portal nao reflete essa mudanca.
+## Problema
 
-## Solucao em duas partes
+Os erros de build sao problemas de tipagem TypeScript nas Edge Functions `close-bomcontrole-contracts` e `sync-acessorias-cron`. O `createClient` retorna um tipo generico que nao e compativel quando usado como `ReturnType<typeof createClient>` em parametros de funcao. Isso faz o TypeScript inferir `never` para os dados retornados do banco, bloqueando o build do preview.
 
-### 1. Empresas ativas: processar normalmente (criar/atualizar)
+## Solucao
 
-Manter o fluxo atual de insert/update apenas para empresas com `Status === "Ativa"`.
+Trocar o tipo dos parametros `supabase` de `ReturnType<typeof createClient>` para `any` nas funcoes auxiliares de ambos os arquivos. Isso e seguro porque sao Edge Functions server-side com service role key.
 
-### 2. Empresas inativas: baixar automaticamente no portal
+### Arquivos
 
-Quando o sync encontra uma empresa com Status diferente de "Ativa" e ela **ja existe no portal sem `data_baixa`**, preencher `data_baixa` com a data atual, mantendo a lista sincronizada.
+**1. `supabase/functions/close-bomcontrole-contracts/index.ts`**
+- Linha 75: `fetchAllContracts(supabase: ReturnType<typeof createClient>, ...)` -> `fetchAllContracts(supabase: any, ...)`
 
-Empresas inativas que **nao existem** no portal serao simplesmente ignoradas (nao faz sentido criar uma empresa ja baixada).
+**2. `supabase/functions/sync-acessorias-cron/index.ts`**
+- Linha 22: `updateJobProgress(supabase: ReturnType<typeof createClient>, ...)` -> `updateJobProgress(supabase: any, ...)`
+- Linha 36: `runSync(supabase: ReturnType<typeof createClient>, ...)` -> `runSync(supabase: any, ...)`
+- Linha 233: `processTenant(supabase: ReturnType<typeof createClient>, ...)` -> `processTenant(supabase: any, ...)`
 
-### Logica no loop de processamento
+Isso resolve todos os ~40 erros de build e o preview voltara a funcionar.
 
-```text
-Para cada empresa da API:
-  totalRead++
-  
-  SE status != "Ativa":
-    Buscar no banco por CNPJ
-    SE existe E nao tem data_baixa:
-      UPDATE data_baixa = hoje
-      totalUpdated++
-    SENAO:
-      totalSkipped++
-    continue
-  
-  (fluxo normal de create/update para ativas)
-```
-
-### Arquivos modificados
-
-**`supabase/functions/sync-acessorias/index.ts`** (funcao principal)
-- Adicionar filtro de status apos `totalRead++`
-- Para inativas existentes no portal: setar `data_baixa`
-- Para inativas sem cadastro: skip
-
-**`supabase/functions/sync-acessorias-cron/index.ts`** (versao cron)
-- Mesma logica de filtro de status
-
-### Impacto
-
-- Velocidade: o processamento pesado (hash + 3 queries de busca) so roda para empresas ativas
-- Para inativas, apenas 1 query leve de busca por CNPJ e necessaria (e so quando existe match)
-- A lista do portal ficara sempre sincronizada com o Acessorias: empresas baixadas la serao baixadas aqui automaticamente
-- Nenhuma mudanca no banco de dados (o campo `data_baixa` ja existe na tabela `empresas`)
-
-### Detalhes tecnicos
-
-- O campo `Status` vem em PascalCase da API do Acessorias (confirmado em diagnosticos anteriores)
-- A busca para inativas usa apenas o match por CNPJ formatado (query unica, sem as 3 queries de fallback)
-- O `synced_at` e atualizado tambem nas empresas baixadas para registrar que foram vistas no sync
-- Contadores: inativas baixadas contam como `totalUpdated`, inativas ignoradas contam como `totalSkipped`
