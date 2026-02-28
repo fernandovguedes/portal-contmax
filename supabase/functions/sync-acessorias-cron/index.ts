@@ -112,7 +112,7 @@ async function runSync(
       for (const company of companies) {
         c.totalRead++;
         try {
-          const rawKey = company.cnpj || company.cpf || company.identificador || company.document || "";
+          const rawKey = company.Identificador || company.cnpj || company.cpf || company.identificador || company.document || "";
           if (!rawKey) {
             await logEntry("warning", "Empresa sem CNPJ/CPF, ignorada", { company });
             c.totalSkipped++;
@@ -120,7 +120,7 @@ async function runSync(
           }
 
           const formattedKey = formatCnpj(rawKey);
-          const nome = company.razaoSocial || company.razao_social || company.nome || company.name || "Sem nome";
+          const nome = company.Razao || company.razaoSocial || company.razao_social || company.Fantasia || company.nome || company.name || "Sem nome";
           const sortedJson = JSON.stringify(company, Object.keys(company).sort());
           const hash = await sha256(sortedJson);
 
