@@ -116,3 +116,50 @@ export function exportToExcel(empresas: Empresa[], mesSelecionado: MesKey) {
   XLSX.utils.book_append_sheet(wb, ws, MES_LABELS[mesSelecionado]);
   XLSX.writeFile(wb, `Controle_Fiscal_${MES_LABELS[mesSelecionado]}_2026.xlsx`);
 }
+
+// ── Honorários Excel Export ──
+
+interface HonorarioRow {
+  empresa_nome: string;
+  fiscal_percentual: number;
+  contabil_percentual: number;
+  pessoal_valor: number;
+  nao_emitir_boleto: boolean;
+  emitir_nf: string;
+}
+
+export function exportHonorariosExcel(
+  empresas: HonorarioRow[],
+  mesLabel: string,
+  getValores: (emp: HonorarioRow) => {
+    valorFiscalContabil: number;
+    valorFuncionarios: number;
+    totalMes: number;
+    numFuncionarios: number;
+    servicosExtras: number;
+    dataPagamento: string;
+  },
+) {
+  const rows = empresas.map((e) => {
+    const v = getValores(e);
+    return {
+      "Razão Social": e.empresa_nome,
+      "Fiscal %": e.fiscal_percentual,
+      "Contábil %": e.contabil_percentual,
+      "Pessoal R$": e.pessoal_valor,
+      "Valor Fisc+Cont": v.valorFiscalContabil,
+      "Nº Func.": v.numFuncionarios,
+      "Valor Func.": v.valorFuncionarios,
+      "Serv. Extras": v.servicosExtras,
+      "Total Mês": v.totalMes,
+      Boleto: e.nao_emitir_boleto ? "Não" : "Sim",
+      "Data Pgto": v.dataPagamento || "—",
+      "Emitir NF": e.emitir_nf || "—",
+    };
+  });
+
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, mesLabel);
+  XLSX.writeFile(wb, `Honorarios_${mesLabel}_2026.xlsx`);
+}

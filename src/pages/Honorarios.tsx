@@ -4,13 +4,17 @@ import { useModulePermissions } from "@/hooks/useModulePermissions";
 import { AppHeader } from "@/components/AppHeader";
 import { LoadingSkeleton } from "@/components/LoadingSkeleton";
 import { HonorariosTable } from "@/components/HonorariosTable";
+import { HonorariosDashboard } from "@/components/HonorariosDashboard";
 import { HonorariosEmpresaDialog } from "@/components/HonorariosEmpresaDialog";
 import { SalarioMinimoDialog } from "@/components/SalarioMinimoDialog";
 import { BomControleSyncButton } from "@/components/BomControleSyncButton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, Plus, Settings } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Search, Plus, Settings, Download } from "lucide-react";
+import { exportHonorariosExcel } from "@/lib/exportExcel";
 import type { HonorarioEmpresa } from "@/hooks/useHonorarios";
 
 const MES_INDEX: Record<string, number> = {
@@ -33,6 +37,11 @@ export default function Honorarios() {
   const [salarioDialogOpen, setSalarioDialogOpen] = useState(false);
   const [editingEmpresa, setEditingEmpresa] = useState<HonorarioEmpresa | null>(null);
 
+  // Filters
+  const [filtroBoleto, setFiltroBoleto] = useState<"todos" | "sim" | "nao">("todos");
+  const [filtroNF, setFiltroNF] = useState<"todos" | "sim" | "nao">("todos");
+  const [somenteAberto, setSomenteAberto] = useState(false);
+
   const filtered = empresas
     .filter((e) => {
       if (!e.empresa_nome.toLowerCase().includes(search.toLowerCase())) return false;
@@ -40,9 +49,27 @@ export default function Honorarios() {
         const mesInicialIdx = MES_INDEX[e.mes_inicial || "janeiro"] ?? 0;
         if (MES_INDEX[mes] < mesInicialIdx) return false;
       }
+      if (filtroBoleto === "sim" && e.nao_emitir_boleto) return false;
+      if (filtroBoleto === "nao" && !e.nao_emitir_boleto) return false;
+      if (filtroNF === "sim" && !e.emitir_nf) return false;
+      if (filtroNF === "nao" && e.emitir_nf) return false;
+      if (somenteAberto && getMesData(e, mes).data_pagamento) return false;
       return true;
     })
     .sort((a, b) => a.empresa_nome.localeCompare(b.empresa_nome, "pt-BR"));
+
+  const handleExport = () => {
+    exportHonorariosExcel(filtered, MES_LABELS[mes], (emp) => {
+      const v = calcularValores(emp as HonorarioEmpresa, mes);
+      const md = getMesData(emp as HonorarioEmpresa, mes);
+      return {
+        ...v,
+        numFuncionarios: md.num_funcionarios,
+        servicosExtras: md.servicos_extras,
+        dataPagamento: md.data_pagamento,
+      };
+    });
+  };
 
   if (loading) return <LoadingSkeleton variant="portal" />;
 
@@ -79,24 +106,66 @@ export default function Honorarios() {
       />
 
       <main className="mx-auto max-w-7xl space-y-6 px-4 py-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <Tabs value={mes} onValueChange={(v) => setMes(v as MesKey)}>
-            <TabsList>
-              {(Object.keys(MES_LABELS) as MesKey[]).map((m) => (
-                <TabsTrigger key={m} value={m}>{MES_LABELS[m]}</TabsTrigger>
-              ))}
-            </TabsList>
-          </Tabs>
-          <div className="flex items-center gap-2">
-            <div className="relative w-full sm:w-72">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Buscar empresa..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9"
-              />
-            </div>
+        <Tabs value={mes} onValueChange={(v) => setMes(v as MesKey)}>
+          <TabsList>
+            {(Object.keys(MES_LABELS) as MesKey[]).map((m) => (
+              <TabsTrigger key={m} value={m}>{MES_LABELS[m]}</TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+
+        <HonorariosDashboard
+          empresas={filtered}
+          mes={mes}
+          calcularValores={calcularValores}
+          getMesData={getMesData}
+        />
+
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative w-full sm:w-56">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Buscar empresa..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+
+          <Select value={filtroBoleto} onValueChange={(v) => setFiltroBoleto(v as any)}>
+            <SelectTrigger className="w-[130px] h-9">
+              <SelectValue placeholder="Boleto" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Boleto: Todos</SelectItem>
+              <SelectItem value="sim">Boleto: Sim</SelectItem>
+              <SelectItem value="nao">Boleto: Não</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={filtroNF} onValueChange={(v) => setFiltroNF(v as any)}>
+            <SelectTrigger className="w-[130px] h-9">
+              <SelectValue placeholder="Emitir NF" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">NF: Todos</SelectItem>
+              <SelectItem value="sim">NF: Sim</SelectItem>
+              <SelectItem value="nao">NF: Não</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <label className="flex items-center gap-1.5 text-sm cursor-pointer select-none">
+            <Checkbox
+              checked={somenteAberto}
+              onCheckedChange={(v) => setSomenteAberto(!!v)}
+            />
+            Somente em aberto
+          </label>
+
+          <div className="ml-auto flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={handleExport}>
+              <Download className="mr-1 h-4 w-4" /> Exportar Excel
+            </Button>
             {canEdit && (
               <BomControleSyncButton
                 empresas={filtered}
