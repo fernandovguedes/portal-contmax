@@ -1,24 +1,27 @@
 
 
-# Fix: Erros de build nas Edge Functions
+# Fix: Permitir digitar valores decimais com virgula nos Servicos Extras
 
 ## Problema
 
-Os erros de build sao problemas de tipagem TypeScript nas Edge Functions `close-bomcontrole-contracts` e `sync-acessorias-cron`. O `createClient` retorna um tipo generico que nao e compativel quando usado como `ReturnType<typeof createClient>` em parametros de funcao. Isso faz o TypeScript inferir `never` para os dados retornados do banco, bloqueando o build do preview.
+Ao digitar um valor como "65,60" no campo de valor dos servicos extras, o componente converte imediatamente a virgula para ponto e faz `parseFloat`, eliminando a virgula antes que o usuario termine de digitar. O campo mostra apenas "65" e nunca permite completar "65,60".
 
 ## Solucao
 
-Trocar o tipo dos parametros `supabase` de `ReturnType<typeof createClient>` para `any` nas funcoes auxiliares de ambos os arquivos. Isso e seguro porque sao Edge Functions server-side com service role key.
+Manter o valor digitado como **string** no estado local durante a edicao, e so converter para numero no momento de **salvar**. Isso permite que o usuario digite livremente "65,60" ou "1.250,00".
 
-### Arquivos
+### Alteracoes em `src/components/ServicosExtrasPopover.tsx`
 
-**1. `supabase/functions/close-bomcontrole-contracts/index.ts`**
-- Linha 75: `fetchAllContracts(supabase: ReturnType<typeof createClient>, ...)` -> `fetchAllContracts(supabase: any, ...)`
+1. Mudar `localItems` para usar um tipo intermediario com `valor` como `string` durante a edicao
+2. No `handleOpen`, converter os valores numericos para string formatada (ex: `65.6` -> `"65,60"` ou simplesmente o numero como string)
+3. No `Input` de valor, usar o valor string diretamente sem conversao
+4. No `handleSave` e no calculo do `total`, converter as strings para numero usando `parseFloat(str.replace(",", "."))`
 
-**2. `supabase/functions/sync-acessorias-cron/index.ts`**
-- Linha 22: `updateJobProgress(supabase: ReturnType<typeof createClient>, ...)` -> `updateJobProgress(supabase: any, ...)`
-- Linha 36: `runSync(supabase: ReturnType<typeof createClient>, ...)` -> `runSync(supabase: any, ...)`
-- Linha 233: `processTenant(supabase: ReturnType<typeof createClient>, ...)` -> `processTenant(supabase: any, ...)`
+### Detalhes tecnicos
 
-Isso resolve todos os ~40 erros de build e o preview voltara a funcionar.
+- Criar um tipo local `LocalItem` com `{ descricao: string; valor: string }`
+- `handleOpen`: mapear items para `{ descricao, valor: item.valor ? String(item.valor).replace(".", ",") : "" }`
+- `updateItem` para campo "valor": apenas gravar a string sem conversao
+- `handleSave`: converter `valor` string -> numero antes de chamar `onSave`
+- `total`: calcular com `parseFloat(item.valor.replace(",", ".")) || 0`
 
