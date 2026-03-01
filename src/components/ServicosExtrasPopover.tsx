@@ -9,6 +9,11 @@ function formatCurrency(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+interface LocalItem {
+  descricao: string;
+  valor: string;
+}
+
 interface Props {
   items: ServicosExtrasItem[];
   totalValue: number;
@@ -18,40 +23,47 @@ interface Props {
 
 export function ServicosExtrasPopover({ items, totalValue, canEdit, onSave }: Props) {
   const [open, setOpen] = useState(false);
-  const [localItems, setLocalItems] = useState<ServicosExtrasItem[]>(items);
+  const [localItems, setLocalItems] = useState<LocalItem[]>([]);
 
   const handleOpen = (isOpen: boolean) => {
     if (isOpen) {
-      setLocalItems(items.length > 0 ? [...items] : [{ descricao: "", valor: 0 }]);
+      setLocalItems(
+        items.length > 0
+          ? items.map((i) => ({
+              descricao: i.descricao,
+              valor: i.valor ? String(i.valor).replace(".", ",") : "",
+            }))
+          : [{ descricao: "", valor: "" }]
+      );
     }
     setOpen(isOpen);
   };
 
   const addItem = () => {
-    setLocalItems([...localItems, { descricao: "", valor: 0 }]);
+    setLocalItems([...localItems, { descricao: "", valor: "" }]);
   };
 
   const removeItem = (index: number) => {
     setLocalItems(localItems.filter((_, i) => i !== index));
   };
 
-  const updateItem = (index: number, field: keyof ServicosExtrasItem, value: string) => {
+  const updateItem = (index: number, field: keyof LocalItem, value: string) => {
     const updated = [...localItems];
-    if (field === "valor") {
-      updated[index] = { ...updated[index], valor: parseFloat(value.replace(",", ".")) || 0 };
-    } else {
-      updated[index] = { ...updated[index], descricao: value };
-    }
+    updated[index] = { ...updated[index], [field]: value };
     setLocalItems(updated);
   };
 
+  const parseValor = (str: string) => parseFloat(str.replace(",", ".")) || 0;
+
   const handleSave = () => {
-    const filtered = localItems.filter(i => i.descricao.trim() || i.valor > 0);
+    const filtered = localItems
+      .map((i) => ({ descricao: i.descricao.trim(), valor: parseValor(i.valor) }))
+      .filter((i) => i.descricao || i.valor > 0);
     onSave(filtered);
     setOpen(false);
   };
 
-  const total = localItems.reduce((sum, i) => sum + i.valor, 0);
+  const total = localItems.reduce((sum, i) => sum + parseValor(i.valor), 0);
 
   if (!canEdit) {
     if (totalValue === 0) return <span className="text-xs">—</span>;
@@ -106,7 +118,7 @@ export function ServicosExtrasPopover({ items, totalValue, canEdit, onSave }: Pr
               <Input
                 placeholder="Valor"
                 className="h-7 text-xs w-20"
-                value={item.valor || ""}
+                value={item.valor}
                 onChange={(e) => updateItem(i, "valor", e.target.value)}
               />
               <Button
