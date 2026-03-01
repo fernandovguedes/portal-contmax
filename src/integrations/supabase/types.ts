@@ -678,7 +678,7 @@ export type Database = {
           id: string
           model_used: string | null
           objetividade: number | null
-          organizacao_id: string
+          organizacao_id: string | null
           pontos_fortes: string[] | null
           pontos_melhoria: string[] | null
           resolucao: number | null
@@ -697,7 +697,7 @@ export type Database = {
           id?: string
           model_used?: string | null
           objetividade?: number | null
-          organizacao_id: string
+          organizacao_id?: string | null
           pontos_fortes?: string[] | null
           pontos_melhoria?: string[] | null
           resolucao?: number | null
@@ -716,7 +716,7 @@ export type Database = {
           id?: string
           model_used?: string | null
           objetividade?: number | null
-          organizacao_id?: string
+          organizacao_id?: string | null
           pontos_fortes?: string[] | null
           pontos_melhoria?: string[] | null
           resolucao?: number | null

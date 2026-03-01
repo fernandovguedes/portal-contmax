@@ -33,14 +33,16 @@ export default function Honorarios() {
   const [salarioDialogOpen, setSalarioDialogOpen] = useState(false);
   const [editingEmpresa, setEditingEmpresa] = useState<HonorarioEmpresa | null>(null);
 
-  const filtered = empresas.filter((e) => {
-    if (!e.empresa_nome.toLowerCase().includes(search.toLowerCase())) return false;
-    if (mes !== "fechamento") {
-      const mesInicialIdx = MES_INDEX[e.mes_inicial || "janeiro"] ?? 0;
-      if (MES_INDEX[mes] < mesInicialIdx) return false;
-    }
-    return true;
-  });
+  const filtered = empresas
+    .filter((e) => {
+      if (!e.empresa_nome.toLowerCase().includes(search.toLowerCase())) return false;
+      if (mes !== "fechamento") {
+        const mesInicialIdx = MES_INDEX[e.mes_inicial || "janeiro"] ?? 0;
+        if (MES_INDEX[mes] < mesInicialIdx) return false;
+      }
+      return true;
+    })
+    .sort((a, b) => a.empresa_nome.localeCompare(b.empresa_nome, "pt-BR"));
 
   if (loading) return <LoadingSkeleton variant="portal" />;
 
