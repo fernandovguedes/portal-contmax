@@ -172,6 +172,7 @@ export type Database = {
       }
       empresas: {
         Row: {
+          bc_client_id: number | null
           cnpj: string
           created_at: string
           data_abertura: string | null
@@ -197,6 +198,7 @@ export type Database = {
           whatsapp_synced_at: string | null
         }
         Insert: {
+          bc_client_id?: number | null
           cnpj: string
           created_at?: string
           data_abertura?: string | null
@@ -222,6 +224,7 @@ export type Database = {
           whatsapp_synced_at?: string | null
         }
         Update: {
+          bc_client_id?: number | null
           cnpj?: string
           created_at?: string
           data_abertura?: string | null
@@ -279,6 +282,8 @@ export type Database = {
       }
       honorarios_empresas: {
         Row: {
+          bc_contrato_id: number | null
+          bc_fatura_id: number | null
           contabil_percentual: number
           created_at: string
           emitir_nf: string
@@ -292,6 +297,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          bc_contrato_id?: number | null
+          bc_fatura_id?: number | null
           contabil_percentual?: number
           created_at?: string
           emitir_nf?: string
@@ -305,6 +312,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          bc_contrato_id?: number | null
+          bc_fatura_id?: number | null
           contabil_percentual?: number
           created_at?: string
           emitir_nf?: string

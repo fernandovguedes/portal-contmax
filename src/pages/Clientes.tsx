@@ -20,7 +20,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Label } from "@/components/ui/label";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Plus, Search, Filter, Pencil, Trash2, Archive, RotateCcw, FileText, FileX, CalendarIcon, Users, Building2, Download, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, Search, Filter, Pencil, Trash2, Archive, RotateCcw, FileText, FileX, CalendarIcon, Users, Building2, Download, ChevronLeft, ChevronRight, Hash } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { exportClientesToExcel } from "@/lib/exportExcel";
 import { useNavigate, useParams } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -63,6 +64,7 @@ export default function Clientes() {
   const [dataCadastroInicio, setDataCadastroInicio] = useState<Date | undefined>();
   const [dataCadastroFim, setDataCadastroFim] = useState<Date | undefined>();
   const [dataCadastroAplicado, setDataCadastroAplicado] = useState<{ inicio?: Date; fim?: Date } | null>(null);
+  const [semNumeroFilter, setSemNumeroFilter] = useState(false);
   const [page, setPage] = useState(1);
   const pageSize = 50;
   const [formOpen, setFormOpen] = useState(false);
@@ -89,7 +91,8 @@ export default function Clientes() {
       }
     }
 
-    return matchesSearch && matchesRegime && matchesDataCadastro;
+    const matchesNumero = !semNumeroFilter || !e.numero;
+    return matchesSearch && matchesRegime && matchesDataCadastro && matchesNumero;
   });
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
@@ -97,7 +100,7 @@ export default function Clientes() {
   const paginatedEmpresas = filtered.slice((safeCurrentPage - 1) * pageSize, safeCurrentPage * pageSize);
 
   // Reset page when filters change
-  useEffect(() => { setPage(1); }, [search, regimeFilter, dataCadastroAplicado]);
+  useEffect(() => { setPage(1); }, [search, regimeFilter, dataCadastroAplicado, semNumeroFilter]);
   
 
   // Keep selectedEmpresa in sync with empresas state
@@ -157,6 +160,11 @@ export default function Clientes() {
           <SyncPanel tenantSlug={orgSlug} tenantId={orgInfo.id} onSyncComplete={refetch} />
         )}
         <div className="flex items-center gap-2 flex-wrap">
+          <label className="flex items-center gap-1.5 text-sm cursor-pointer border rounded-md px-3 py-1.5 bg-card hover:bg-muted/50 transition-colors">
+            <Checkbox checked={semNumeroFilter} onCheckedChange={(v) => setSemNumeroFilter(!!v)} />
+            <Hash className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="text-muted-foreground whitespace-nowrap">Sem Nº Questor</span>
+          </label>
           <Select value={regimeFilter} onValueChange={(v) => setRegimeFilter(v as RegimeTributario | "todos")}>
             <SelectTrigger className="w-[180px]">
               <Filter className="h-4 w-4 mr-1 text-muted-foreground" />
