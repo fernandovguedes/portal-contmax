@@ -55,6 +55,7 @@ function rowToEmpresa(row: any): Empresa {
     socios: row.socios ?? [],
     dataBaixa: row.data_baixa ?? undefined,
     whatsapp: row.whatsapp ?? "",
+    externalSource: row.external_source ?? undefined,
     meses: hasMeses ? {
       janeiro: { ...defaultMeses.janeiro, ...rawMeses.janeiro },
       fevereiro: { ...defaultMeses.fevereiro, ...rawMeses.fevereiro },
@@ -144,7 +145,7 @@ export function useEmpresas(organizacaoId?: string) {
       return;
     }
 
-    const COLUMNS = "id, numero, nome, cnpj, regime_tributario, emite_nota_fiscal, data_abertura, data_baixa, data_cadastro, whatsapp, socios, organizacao_id, meses, obrigacoes";
+    const COLUMNS = "id, numero, nome, cnpj, regime_tributario, emite_nota_fiscal, data_abertura, data_baixa, data_cadastro, whatsapp, socios, organizacao_id, meses, obrigacoes, external_source";
     const { data, error } = await supabase
       .from("empresas")
       .select(COLUMNS)
