@@ -136,6 +136,7 @@ export interface Empresa {
   obrigacoes: ObrigacoesData;
   dataBaixa?: string;
   whatsapp?: string;
+  externalSource?: string;
 }
 
 const MES_TO_INDEX: Record<MesKey, number> = {
