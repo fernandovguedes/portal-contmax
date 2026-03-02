@@ -56,6 +56,13 @@ export type Database = {
             referencedRelation: "empresas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "bc_contracts_portal_company_id_fkey"
+            columns: ["portal_company_id"]
+            isOneToOne: false
+            referencedRelation: "pg_socios_view"
+            referencedColumns: ["empresa_id"]
+          },
         ]
       }
       bc_invoice_map: {
@@ -121,6 +128,13 @@ export type Database = {
             referencedRelation: "empresas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "bc_invoice_map_portal_company_id_fkey"
+            columns: ["portal_company_id"]
+            isOneToOne: false
+            referencedRelation: "pg_socios_view"
+            referencedColumns: ["empresa_id"]
+          },
         ]
       }
       bc_sync_log: {
@@ -167,6 +181,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "empresas"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bc_sync_log_portal_company_id_fkey"
+            columns: ["portal_company_id"]
+            isOneToOne: false
+            referencedRelation: "pg_socios_view"
+            referencedColumns: ["empresa_id"]
           },
         ]
       }
@@ -337,6 +358,13 @@ export type Database = {
             referencedRelation: "empresas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "honorarios_empresas_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "pg_socios_view"
+            referencedColumns: ["empresa_id"]
+          },
         ]
       }
       integration_jobs: {
@@ -480,6 +508,214 @@ export type Database = {
         }
         Relationships: []
       }
+      irpf_cases: {
+        Row: {
+          ano_base: number
+          cpf_conjuge: string | null
+          created_at: string
+          data_pagamento: string | null
+          dependentes: Json | null
+          endereco_completo: string | null
+          estado_civil: string | null
+          id: string
+          irpf_person_id: string
+          observacoes: string | null
+          regime: string | null
+          responsavel: string
+          senha_govbr: string | null
+          status: string
+          tenant_id: string
+          updated_at: string
+          valor_apostas: string | null
+          valor_cobrado: number
+        }
+        Insert: {
+          ano_base: number
+          cpf_conjuge?: string | null
+          created_at?: string
+          data_pagamento?: string | null
+          dependentes?: Json | null
+          endereco_completo?: string | null
+          estado_civil?: string | null
+          id?: string
+          irpf_person_id: string
+          observacoes?: string | null
+          regime?: string | null
+          responsavel?: string
+          senha_govbr?: string | null
+          status?: string
+          tenant_id: string
+          updated_at?: string
+          valor_apostas?: string | null
+          valor_cobrado?: number
+        }
+        Update: {
+          ano_base?: number
+          cpf_conjuge?: string | null
+          created_at?: string
+          data_pagamento?: string | null
+          dependentes?: Json | null
+          endereco_completo?: string | null
+          estado_civil?: string | null
+          id?: string
+          irpf_person_id?: string
+          observacoes?: string | null
+          regime?: string | null
+          responsavel?: string
+          senha_govbr?: string | null
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+          valor_apostas?: string | null
+          valor_cobrado?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "irpf_cases_irpf_person_id_fkey"
+            columns: ["irpf_person_id"]
+            isOneToOne: false
+            referencedRelation: "irpf_people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "irpf_cases_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      irpf_documents: {
+        Row: {
+          bucket: string
+          created_at: string
+          doc_type: string
+          id: string
+          irpf_case_id: string
+          mime_type: string | null
+          notes: string | null
+          original_name: string | null
+          path: string
+          size_bytes: number | null
+          tenant_id: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          bucket?: string
+          created_at?: string
+          doc_type: string
+          id?: string
+          irpf_case_id: string
+          mime_type?: string | null
+          notes?: string | null
+          original_name?: string | null
+          path: string
+          size_bytes?: number | null
+          tenant_id: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          bucket?: string
+          created_at?: string
+          doc_type?: string
+          id?: string
+          irpf_case_id?: string
+          mime_type?: string | null
+          notes?: string | null
+          original_name?: string | null
+          path?: string
+          size_bytes?: number | null
+          tenant_id?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "irpf_documents_irpf_case_id_fkey"
+            columns: ["irpf_case_id"]
+            isOneToOne: false
+            referencedRelation: "irpf_cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "irpf_documents_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      irpf_people: {
+        Row: {
+          ativo: boolean
+          cpf: string
+          created_at: string
+          created_by: string | null
+          data_nascimento: string | null
+          email: string | null
+          id: string
+          nome: string
+          pg_empresa_id: string | null
+          pg_socio_cpf: string | null
+          source: string
+          telefone: string | null
+          tenant_id: string
+        }
+        Insert: {
+          ativo?: boolean
+          cpf: string
+          created_at?: string
+          created_by?: string | null
+          data_nascimento?: string | null
+          email?: string | null
+          id?: string
+          nome: string
+          pg_empresa_id?: string | null
+          pg_socio_cpf?: string | null
+          source: string
+          telefone?: string | null
+          tenant_id: string
+        }
+        Update: {
+          ativo?: boolean
+          cpf?: string
+          created_at?: string
+          created_by?: string | null
+          data_nascimento?: string | null
+          email?: string | null
+          id?: string
+          nome?: string
+          pg_empresa_id?: string | null
+          pg_socio_cpf?: string | null
+          source?: string
+          telefone?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "irpf_people_pg_empresa_id_fkey"
+            columns: ["pg_empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "irpf_people_pg_empresa_id_fkey"
+            columns: ["pg_empresa_id"]
+            isOneToOne: false
+            referencedRelation: "pg_socios_view"
+            referencedColumns: ["empresa_id"]
+          },
+          {
+            foreignKeyName: "irpf_people_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       modules: {
         Row: {
           ativo: boolean
@@ -566,6 +802,13 @@ export type Database = {
             referencedRelation: "empresas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "onecode_contact_match_log_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "pg_socios_view"
+            referencedColumns: ["empresa_id"]
+          },
         ]
       }
       onecode_contact_review: {
@@ -618,6 +861,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "empresas"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onecode_contact_review_suggested_company_id_fkey"
+            columns: ["suggested_company_id"]
+            isOneToOne: false
+            referencedRelation: "pg_socios_view"
+            referencedColumns: ["empresa_id"]
           },
         ]
       }
@@ -1117,11 +1367,37 @@ export type Database = {
             referencedRelation: "empresas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "whatsapp_logs_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "pg_socios_view"
+            referencedColumns: ["empresa_id"]
+          },
         ]
       }
     }
     Views: {
-      [_ in never]: never
+      pg_socios_view: {
+        Row: {
+          empresa_cnpj: string | null
+          empresa_id: string | null
+          empresa_nome: string | null
+          socio_cpf: string | null
+          socio_nome: string | null
+          socio_percentual: number | null
+          tenant_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "empresas_organizacao_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       has_module_access: {
