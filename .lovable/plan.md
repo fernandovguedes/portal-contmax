@@ -1,47 +1,44 @@
 
 
-# Filtro "Sem Numero Questor" no modulo Clientes
+# Filtro "Sem Numero Questor" - Correcao
 
-## Objetivo
+## Problema
 
-Adicionar um filtro checkbox nos modulos Clientes P&G e Contmax para buscar empresas que nao tem o numero do Questor preenchido.
+O campo `numero` na tabela `empresas` tem `DEFAULT nextval('empresas_numero_seq')`, ou seja, toda empresa criada via sync recebe automaticamente um numero sequencial. O filtro atual (`!e.numero`) nunca encontra resultados porque nenhuma empresa tem `numero` vazio.
+
+## Abordagem
+
+Empresas vindas do sync (`external_source = 'acessorias'`) nunca tiveram o numero do Questor atribuido manualmente -- o numero que possuem e apenas o auto-incremento do banco. Portanto, o filtro "Sem N Questor" deve identificar essas empresas.
 
 ## Alteracoes
 
-### Arquivo: `src/pages/Clientes.tsx`
+### 1. Tipo `Empresa` em `src/types/fiscal.ts`
 
-Como ambas as organizacoes (P&G e Contmax) usam o mesmo componente `Clientes.tsx` (diferenciado pelo parametro `orgSlug`), basta uma unica alteracao neste arquivo.
-
-1. **Novo estado**: adicionar `semNumeroQuestorFilter` (boolean, default `false`)
-2. **Logica de filtro**: quando ativo, mostrar apenas empresas onde `e.numero` e falsy (0, null, undefined)
-3. **UI**: adicionar um checkbox/label ao lado dos filtros existentes (regime, busca, data), seguindo o mesmo padrao visual dos filtros do modulo fiscal -- um `Checkbox` com icone e texto dentro de um label estilizado
-4. **Reset de pagina**: incluir o novo filtro no `useEffect` que reseta a paginacao
-
-### Detalhes tecnicos
-
-Estado:
+Adicionar campo opcional:
 ```
-const [semNumeroFilter, setSemNumeroFilter] = useState(false);
+externalSource?: string;
 ```
 
-Filtro adicionado ao `filtered`:
+### 2. Hook `src/hooks/useEmpresas.ts`
+
+- Incluir `external_source` na constante `COLUMNS` da query
+- Mapear `external_source` para `externalSource` no `rowToEmpresa`
+
+### 3. Filtro em `src/pages/Clientes.tsx`
+
+Trocar a logica do filtro de:
 ```
 const matchesNumero = !semNumeroFilter || !e.numero;
-return matchesSearch && matchesRegime && matchesDataCadastro && matchesNumero;
+```
+Para:
+```
+const matchesNumero = !semNumeroFilter || e.externalSource === 'acessorias';
 ```
 
-UI (inserida na barra de filtros, antes do Select de regime):
-```
-<label className="flex items-center gap-1.5 text-sm cursor-pointer border rounded-md px-3 py-1.5 bg-card hover:bg-muted/50 transition-colors">
-  <Checkbox checked={semNumeroFilter} onCheckedChange={(v) => setSemNumeroFilter(!!v)} />
-  <FileX className="h-3.5 w-3.5 text-muted-foreground" />
-  <span className="text-muted-foreground">Sem N Questor</span>
-</label>
-```
+Isso mostra apenas empresas que vieram do sync (que nunca tiveram numero Questor real atribuido).
 
-Nenhuma alteracao no banco de dados e necessaria.
+### Resumo
 
-### Nota sobre os erros de build
-
-Os erros de build listados sao todos em edge functions (`sync-acessorias`, `sync-onecode-contacts`) e nao estao relacionados a esta alteracao. Eles existem por incompatibilidade de tipos do Supabase client nessas funcoes e serao tratados separadamente.
-
+- Nenhuma alteracao no banco de dados
+- 3 arquivos editados: `types/fiscal.ts`, `hooks/useEmpresas.ts`, `pages/Clientes.tsx`
+- Logica simples: empresa synced = sem numero Questor real
