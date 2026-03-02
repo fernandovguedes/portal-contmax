@@ -1,63 +1,47 @@
 
 
-# Dashboard + Filtros + Exportar Excel no Honorarios Mensal
+# Filtro "Sem Numero Questor" no modulo Clientes
 
-## Visao Geral
+## Objetivo
 
-Adicionar ao modulo de Honorarios Mensal:
-1. **Cards KPI** acima da tabela: Total Empresas, Total Mes (soma), Total Mes Pago
-2. **Filtros** ao lado da busca: Boleto (Sim/Nao/Todos), Emitir NF (Sim/Nao/Todos), Somente pgtos em aberto
-3. **Botao Exportar Excel** com os dados filtrados
+Adicionar um filtro checkbox nos modulos Clientes P&G e Contmax para buscar empresas que nao tem o numero do Questor preenchido.
 
-## Componentes
+## Alteracoes
 
-### 1. Novo componente `src/components/HonorariosDashboard.tsx`
+### Arquivo: `src/pages/Clientes.tsx`
 
-Recebe as empresas ja filtradas pelo mes, o `calcularValores` e `getMesData` do hook. Renderiza 3 cards no estilo ja existente em `DashboardSummary.tsx`:
+Como ambas as organizacoes (P&G e Contmax) usam o mesmo componente `Clientes.tsx` (diferenciado pelo parametro `orgSlug`), basta uma unica alteracao neste arquivo.
 
-- **Total Empresas**: quantidade de empresas na lista filtrada
-- **Total Mes**: soma de `totalMes` de todas as empresas (formatado em BRL)
-- **Total Pago**: soma de `totalMes` das empresas onde `data_pagamento` esta preenchida, com contagem (ex: "R$ 15.230,00 (12 de 25)")
+1. **Novo estado**: adicionar `semNumeroQuestorFilter` (boolean, default `false`)
+2. **Logica de filtro**: quando ativo, mostrar apenas empresas onde `e.numero` e falsy (0, null, undefined)
+3. **UI**: adicionar um checkbox/label ao lado dos filtros existentes (regime, busca, data), seguindo o mesmo padrao visual dos filtros do modulo fiscal -- um `Checkbox` com icone e texto dentro de um label estilizado
+4. **Reset de pagina**: incluir o novo filtro no `useEffect` que reseta a paginacao
 
-Usa Card/CardHeader/CardContent, icones do lucide (Building2, DollarSign, CheckCircle2), com gradientes e border-l-4 seguindo o padrao visual existente.
+### Detalhes tecnicos
 
-### 2. Filtros na pagina `src/pages/Honorarios.tsx`
+Estado:
+```
+const [semNumeroFilter, setSemNumeroFilter] = useState(false);
+```
 
-Adicionar estados:
-- `filtroBoleto`: `"todos" | "sim" | "nao"` (default: `"todos"`)
-- `filtroNF`: `"todos" | "sim" | "nao"` (default: `"todos"`)
-- `somenteAberto`: `boolean` (default: `false`)
+Filtro adicionado ao `filtered`:
+```
+const matchesNumero = !semNumeroFilter || !e.numero;
+return matchesSearch && matchesRegime && matchesDataCadastro && matchesNumero;
+```
 
-Aplicar filtros sobre a lista `filtered` existente:
-- **Boleto = Sim**: `!emp.nao_emitir_boleto`
-- **Boleto = Nao**: `emp.nao_emitir_boleto`
-- **Emitir NF = Sim**: `emp.emitir_nf` nao vazio
-- **Emitir NF = Nao**: `emp.emitir_nf` vazio
-- **Somente aberto**: `!getMesData(emp, mes).data_pagamento`
+UI (inserida na barra de filtros, antes do Select de regime):
+```
+<label className="flex items-center gap-1.5 text-sm cursor-pointer border rounded-md px-3 py-1.5 bg-card hover:bg-muted/50 transition-colors">
+  <Checkbox checked={semNumeroFilter} onCheckedChange={(v) => setSemNumeroFilter(!!v)} />
+  <FileX className="h-3.5 w-3.5 text-muted-foreground" />
+  <span className="text-muted-foreground">Sem N Questor</span>
+</label>
+```
 
-UI dos filtros: renderizar ao lado do campo de busca usando `Select` para Boleto e NF, e um `Switch` ou `Checkbox` para "Somente em aberto". Tudo compacto numa linha.
+Nenhuma alteracao no banco de dados e necessaria.
 
-### 3. Botao Exportar Excel
+### Nota sobre os erros de build
 
-Nova funcao `exportHonorariosExcel` em `src/lib/exportExcel.ts` (ou inline no componente).
+Os erros de build listados sao todos em edge functions (`sync-acessorias`, `sync-onecode-contacts`) e nao estao relacionados a esta alteracao. Eles existem por incompatibilidade de tipos do Supabase client nessas funcoes e serao tratados separadamente.
 
-Gera uma planilha com as colunas da tabela atual (Razao Social, Fiscal %, Contabil %, Pessoal R$, Valor Fisc+Cont, N Func, Valor Func, Serv. Extras, Total Mes, Boleto, Data Pgto, Emitir NF) usando a lib `xlsx` ja instalada.
-
-Botao com icone `Download` posicionado junto aos filtros/busca.
-
-### 4. Alteracoes em `src/pages/Honorarios.tsx`
-
-- Importar `HonorariosDashboard`
-- Adicionar estados dos filtros
-- Estender a cadeia de `.filter()` com os novos filtros
-- Renderizar `<HonorariosDashboard>` entre os tabs e a tabela
-- Renderizar controles de filtro na barra de acoes
-- Adicionar botao Exportar Excel
-
-## Detalhes tecnicos
-
-- Os KPIs sao computados sobre a lista **ja filtrada** (mesma lista que alimenta a tabela)
-- A exportacao usa `xlsx` (`import * as XLSX from "xlsx"`) ja presente no projeto
-- Os filtros Select usam o componente `@/components/ui/select` existente
-- O checkbox "Somente em aberto" usa `@/components/ui/checkbox`
-- Nenhuma alteracao no banco de dados e necessaria
