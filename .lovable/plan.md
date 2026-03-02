@@ -1,44 +1,31 @@
 
 
-# Filtro "Sem Numero Questor" - Correcao
+# Correcao do Filtro "Sem N Questor"
 
 ## Problema
 
-O campo `numero` na tabela `empresas` tem `DEFAULT nextval('empresas_numero_seq')`, ou seja, toda empresa criada via sync recebe automaticamente um numero sequencial. O filtro atual (`!e.numero`) nunca encontra resultados porque nenhuma empresa tem `numero` vazio.
+O filtro atual usa `e.externalSource === 'acessorias'`, o que mostra **todas** as 811 empresas sincronizadas, incluindo aquelas que ja tiveram o numero Questor atribuido manualmente.
 
-## Abordagem
+## Analise dos dados
 
-Empresas vindas do sync (`external_source = 'acessorias'`) nunca tiveram o numero do Questor atribuido manualmente -- o numero que possuem e apenas o auto-incremento do banco. Portanto, o filtro "Sem N Questor" deve identificar essas empresas.
+Consultando o banco:
+- 21 empresas tem `numero = 0` (15 synced + 6 manuais) -- estas sao as que realmente nao tem numero Questor
+- As demais empresas synced ja receberam numero Questor real (1, 2, 3, ... 10022)
 
-## Alteracoes
+O `numero = 0` e o indicador correto de "sem numero Questor", pois empresas que receberam um numero real tem valores > 0.
 
-### 1. Tipo `Empresa` em `src/types/fiscal.ts`
+## Alteracao
 
-Adicionar campo opcional:
-```
-externalSource?: string;
-```
-
-### 2. Hook `src/hooks/useEmpresas.ts`
-
-- Incluir `external_source` na constante `COLUMNS` da query
-- Mapear `external_source` para `externalSource` no `rowToEmpresa`
-
-### 3. Filtro em `src/pages/Clientes.tsx`
+### Arquivo: `src/pages/Clientes.tsx`
 
 Trocar a logica do filtro de:
 ```
-const matchesNumero = !semNumeroFilter || !e.numero;
+const matchesNumero = !semNumeroFilter || e.externalSource === 'acessorias';
 ```
 Para:
 ```
-const matchesNumero = !semNumeroFilter || e.externalSource === 'acessorias';
+const matchesNumero = !semNumeroFilter || e.numero === 0;
 ```
 
-Isso mostra apenas empresas que vieram do sync (que nunca tiveram numero Questor real atribuido).
+Apenas 1 linha alterada em 1 arquivo. Nenhuma outra mudanca necessaria -- o campo `externalSource` pode continuar existindo no tipo e no hook para uso futuro.
 
-### Resumo
-
-- Nenhuma alteracao no banco de dados
-- 3 arquivos editados: `types/fiscal.ts`, `hooks/useEmpresas.ts`, `pages/Clientes.tsx`
-- Logica simples: empresa synced = sem numero Questor real
