@@ -137,6 +137,7 @@ export interface Empresa {
   dataBaixa?: string;
   whatsapp?: string;
   externalSource?: string;
+  numeroQuestorConfirmado?: boolean;
 }
 
 const MES_TO_INDEX: Record<MesKey, number> = {

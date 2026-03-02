@@ -186,6 +186,7 @@ export type Database = {
           meses: Json
           nome: string
           numero: number
+          numero_questor_confirmado: boolean
           obrigacoes: Json
           onecode_contact_id: string | null
           organizacao_id: string
@@ -212,6 +213,7 @@ export type Database = {
           meses?: Json
           nome: string
           numero?: number
+          numero_questor_confirmado?: boolean
           obrigacoes?: Json
           onecode_contact_id?: string | null
           organizacao_id: string
@@ -238,6 +240,7 @@ export type Database = {
           meses?: Json
           nome?: string
           numero?: number
+          numero_questor_confirmado?: boolean
           obrigacoes?: Json
           onecode_contact_id?: string | null
           organizacao_id?: string

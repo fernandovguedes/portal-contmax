@@ -56,6 +56,7 @@ function rowToEmpresa(row: any): Empresa {
     dataBaixa: row.data_baixa ?? undefined,
     whatsapp: row.whatsapp ?? "",
     externalSource: row.external_source ?? undefined,
+    numeroQuestorConfirmado: row.numero_questor_confirmado ?? false,
     meses: hasMeses ? {
       janeiro: { ...defaultMeses.janeiro, ...rawMeses.janeiro },
       fevereiro: { ...defaultMeses.fevereiro, ...rawMeses.fevereiro },
@@ -92,6 +93,7 @@ function empresaToRow(empresa: Partial<Empresa>) {
   if (empresa.obrigacoes !== undefined) row.obrigacoes = empresa.obrigacoes;
   if (empresa.dataBaixa !== undefined) row.data_baixa = empresa.dataBaixa;
   if (empresa.whatsapp !== undefined) row.whatsapp = empresa.whatsapp;
+  if (empresa.numeroQuestorConfirmado !== undefined) row.numero_questor_confirmado = empresa.numeroQuestorConfirmado;
   return row;
 }
 
@@ -145,7 +147,7 @@ export function useEmpresas(organizacaoId?: string) {
       return;
     }
 
-    const COLUMNS = "id, numero, nome, cnpj, regime_tributario, emite_nota_fiscal, data_abertura, data_baixa, data_cadastro, whatsapp, socios, organizacao_id, meses, obrigacoes, external_source";
+    const COLUMNS = "id, numero, nome, cnpj, regime_tributario, emite_nota_fiscal, data_abertura, data_baixa, data_cadastro, whatsapp, socios, organizacao_id, meses, obrigacoes, external_source, numero_questor_confirmado";
     const { data, error } = await supabase
       .from("empresas")
       .select(COLUMNS)

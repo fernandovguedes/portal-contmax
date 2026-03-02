@@ -174,6 +174,7 @@ async function processBatch(
             emite_nota_fiscal: true, meses: {}, obrigacoes: {}, socios: [],
             external_source: "acessorias", external_key: digitsOnly,
             raw_payload: company, hash_payload: hash, synced_at: new Date().toISOString(),
+            numero_questor_confirmado: false,
           }).select("id").maybeSingle();
           if (insertErr) {
             if (c.totalErrors < 5) console.log(`[sync-acessorias] INSERT ERROR: ${formattedKey} — ${insertErr.message}`);
