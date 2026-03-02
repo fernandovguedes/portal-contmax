@@ -7,8 +7,8 @@ const corsHeaders = {
 };
 
 const BC_BASE = "https://apinewintegracao.bomcontrole.com.br/integracao";
-const BATCH_SIZE = 2;
-const DELAY_MS = 5000;
+const BATCH_SIZE = 8;
+const DELAY_MS = 3000;
 
 function getApiKey(tenantId: string): string {
   const envKey = `BOMCONTROLE_API_KEY_${tenantId.toUpperCase()}`;
@@ -108,7 +108,16 @@ Deno.serve(async (req: Request) => {
       );
     }
     const token = authHeader.replace("Bearer ", "");
-    const isInternalCall = token === serviceKey;
+    let isInternalCall = token === serviceKey;
+    if (!isInternalCall) {
+      try {
+        const payloadB64 = token.split(".")[1];
+        if (payloadB64) {
+          const payload = JSON.parse(atob(payloadB64));
+          if (payload.role === "service_role") isInternalCall = true;
+        }
+      } catch (_) {}
+    }
 
     if (!isInternalCall) {
       const userClient = createClient(supabaseUrl, anonKey, {

@@ -7,7 +7,6 @@ import { HonorariosTable } from "@/components/HonorariosTable";
 import { HonorariosDashboard } from "@/components/HonorariosDashboard";
 import { HonorariosEmpresaDialog } from "@/components/HonorariosEmpresaDialog";
 import { SalarioMinimoDialog } from "@/components/SalarioMinimoDialog";
-import { BomControleSyncButton } from "@/components/BomControleSyncButton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -166,14 +165,6 @@ export default function Honorarios() {
             <Button variant="outline" size="sm" onClick={handleExport}>
               <Download className="mr-1 h-4 w-4" /> Exportar Excel
             </Button>
-            {canEdit && (
-              <BomControleSyncButton
-                empresas={filtered}
-                mes={mes}
-                calcularValores={calcularValores}
-                canEdit={canEdit}
-              />
-            )}
             {canEdit && (
               <Button
                 size="sm"
