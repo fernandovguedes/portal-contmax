@@ -1,11 +1,14 @@
 import { useState, useRef } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2, RefreshCw, Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { CustomFixedScrollbar } from "@/components/CustomFixedScrollbar";
 import { ServicosExtrasPopover } from "@/components/ServicosExtrasPopover";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useToast } from "@/hooks/use-toast";
 import type { HonorarioEmpresa, MesKey, HonorarioMesData } from "@/hooks/useHonorarios";
 
 interface Props {
@@ -23,6 +26,12 @@ interface Props {
   onEdit: (empresa: HonorarioEmpresa) => void;
   onDelete: (id: string) => void;
 }
+
+const MES_TO_NUM: Record<string, string> = {
+  janeiro: "01", fevereiro: "02", marco: "03", abril: "04",
+  maio: "05", junho: "06", julho: "07", agosto: "08",
+  setembro: "09", outubro: "10", novembro: "11", dezembro: "12",
+};
 
 function formatCurrency(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -119,6 +128,75 @@ function InlineTextCell({
   );
 }
 
+type SyncStatus = "idle" | "syncing" | "success" | "error";
+
+function SyncEmpresaButton({ empresaId, mes, totalMes }: { empresaId: string; mes: MesKey; totalMes: number }) {
+  const [status, setStatus] = useState<SyncStatus>("idle");
+  const { toast } = useToast();
+  const monthNum = MES_TO_NUM[mes];
+
+  if (!monthNum || mes === "fechamento") return null;
+
+  const competencia = `2026-${monthNum}`;
+
+  const handleSync = async () => {
+    setStatus("syncing");
+    try {
+      const { data, error } = await supabase.functions.invoke("sync-bomcontrole", {
+        body: {
+          tenant_id: "contmax",
+          competencia,
+          items: [{ portal_company_id: empresaId, valor_total_mes: totalMes }],
+        },
+      });
+
+      if (error) throw error;
+
+      const result = data?.results?.[0];
+      if (result?.status === "synced") {
+        setStatus("success");
+        toast({ title: "Fatura atualizada", description: `Valor ${formatCurrency(totalMes)} sincronizado no BomControle.` });
+      } else if (result?.status === "unchanged") {
+        setStatus("success");
+        toast({ title: "Sem alteração", description: "Valor já está atualizado no BomControle." });
+      } else {
+        setStatus("error");
+        toast({ title: "Erro na sincronização", description: result?.message || "Erro desconhecido", variant: "destructive" });
+      }
+
+      setTimeout(() => setStatus("idle"), 3000);
+    } catch (err: any) {
+      setStatus("error");
+      toast({ title: "Erro", description: err.message || String(err), variant: "destructive" });
+      setTimeout(() => setStatus("idle"), 3000);
+    }
+  };
+
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 ml-1"
+            onClick={handleSync}
+            disabled={status === "syncing"}
+          >
+            {status === "syncing" && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+            {status === "idle" && <RefreshCw className="h-3.5 w-3.5 text-muted-foreground hover:text-primary" />}
+            {status === "success" && <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />}
+            {status === "error" && <XCircle className="h-3.5 w-3.5 text-destructive" />}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>Sincronizar fatura no BomControle</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
 export function HonorariosTable({ empresas, mes, salarioMinimo, canEdit, calcularValores, getMesData, onUpdateMes, onEdit, onDelete }: Props) {
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; nome: string } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -139,7 +217,7 @@ export function HonorariosTable({ empresas, mes, salarioMinimo, canEdit, calcula
                 <TableHead className="text-xs text-center w-16">Nº Func</TableHead>
                 <TableHead className="text-xs text-center w-24">Valor Func</TableHead>
                 <TableHead className="text-xs text-center w-24">Serv. Extras</TableHead>
-                <TableHead className="text-xs text-center w-24 font-bold">Total Mês</TableHead>
+                <TableHead className="text-xs text-center w-28 font-bold">Total Mês</TableHead>
                 <TableHead className="text-xs text-center w-20">Boleto</TableHead>
                 <TableHead className="text-xs text-center min-w-[140px]">Data Pgto</TableHead>
                 <TableHead className="text-xs text-center min-w-[120px]">Emitir NF</TableHead>
@@ -186,7 +264,18 @@ export function HonorariosTable({ empresas, mes, salarioMinimo, canEdit, calcula
                           }}
                         />
                       </TableCell>
-                      <TableCell className="text-xs text-center font-bold text-primary">{formatCurrency(totalMes)}</TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex items-center justify-center">
+                          <span className="text-xs font-bold text-primary">{formatCurrency(totalMes)}</span>
+                          {canEdit && !emp.nao_emitir_boleto && mes !== "fechamento" && (
+                            <SyncEmpresaButton
+                              empresaId={emp.empresa_id}
+                              mes={mes}
+                              totalMes={totalMes}
+                            />
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell className="text-xs text-center">
                         {emp.nao_emitir_boleto ? (
                           <span className="text-destructive font-medium">Não</span>
