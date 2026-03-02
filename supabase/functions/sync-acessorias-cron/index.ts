@@ -158,6 +158,7 @@ async function runSync(
               raw_payload: company,
               hash_payload: hash,
               synced_at: new Date().toISOString(),
+              numero_questor_confirmado: false,
             });
             if (insertErr) {
               await logEntry("error", `Insert failed: ${formattedKey}`, { error: insertErr.message });

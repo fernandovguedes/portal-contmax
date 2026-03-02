@@ -74,6 +74,7 @@ export function EmpresaFormDialog({ open, onOpenChange, empresa, onSave, onUpdat
       socios,
       meses,
       obrigacoes: empresa?.obrigacoes ?? createEmptyObrigacoes(),
+      numeroQuestorConfirmado: true,
     };
     if (isEditing && empresa) {
       onUpdate(empresa.id, data);
