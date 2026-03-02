@@ -1,81 +1,129 @@
 
+# Modulo IRPF -- Ajuste Multi-Tenant por Organizacao
 
-# Flag `numero_questor_confirmado` para filtro correto
+## Problema Identificado
 
-## Problema
-
-- `externalSource === 'acessorias'` mostra TODAS as empresas synced, inclusive as que ja tem numero real
-- `numero === 0` nao funciona para P&G (la nenhuma empresa tem zero)
-- Nao existe hoje um campo que distinga "numero real preenchido por usuario" de "numero sequencial automatico"
+O plano original tinha um unico modulo "irpf" com um seletor de organizacao no topo da pagina. Isso nao funciona porque:
+- Usuarios colaboradores podem ter acesso apenas a PG OU Contmax
+- O controle de permissao via `useModulePermissions` precisa de um slug por org (como `clientes-pg` / `clientes-contmax`)
+- A rota precisa incluir o slug da org para que o sistema saiba de qual tenant estamos falando
 
 ## Solucao
 
-Adicionar coluna `numero_questor_confirmado` (boolean, default `false`) na tabela `empresas`. Empresas existentes serao marcadas como `true` (ja tem numero). Apenas novas empresas vindas do sync terao `false`, aparecendo no filtro ate um usuario confirmar o numero.
+Seguir o mesmo padrao de Clientes:
+- Rota: `/irpf/:orgSlug` (ex: `/irpf/pg`, `/irpf/contmax`)
+- Modulos separados: `irpf-pg` e `irpf-contmax` na tabela `modules`
+- Permissao: `useModulePermissions(`irpf-${orgSlug}`)`
+- Cada pessoa/case filtrado por `tenant_id` resolvido a partir do slug da URL
 
-## Alteracoes
+## Alteracoes em Relacao ao Plano Anterior
 
-### 1. Migracao SQL
+### 1. Dados: Criar modulos irpf-pg e irpf-contmax
+
+Inserir na tabela `modules`:
+- `irpf-pg` (nome: "IRPF P&G", organizacao_id: P&G uuid, icone: FileText, ativo: true)
+- `irpf-contmax` (nome: "IRPF Contmax", organizacao_id: Contmax uuid, icone: FileText, ativo: true)
+
+Atualizar ou desativar o modulo "irpf" generico existente (slug `irpf`).
+
+### 2. Roteamento
+
+No `App.tsx`:
+- `/irpf/:orgSlug` -- pagina principal (lista declaracoes/pessoas)
+- `/irpf/:orgSlug/:caseId` -- detalhe da declaracao
+
+No `Portal.tsx` (MODULE_ROUTES):
+- `"irpf-pg": "/irpf/pg"`
+- `"irpf-contmax": "/irpf/contmax"`
+
+### 3. Pagina principal (src/pages/Irpf.tsx)
+
+- Extrair `orgSlug` da URL via `useParams`
+- Resolver `tenant_id` a partir do slug (query `organizacoes` por slug, mesmo padrao de Clientes.tsx)
+- Usar `useModulePermissions(`irpf-${orgSlug}`)` para controle de edicao
+- **Remover** o seletor de organizacao do topo (a org ja vem da URL)
+- Manter seletor de ano-base
+
+### 4. Dialog "Nova Pessoa"
+
+- Tab "Cliente P&G" so aparece se `orgSlug === 'pg'` (busca pg_socios_view filtrada pelo tenant)
+- Tab "Cliente Contmax" so aparece se `orgSlug === 'contmax'` (busca empresas da Contmax)
+- Tab "Avulso" sempre disponivel
+- Ao criar pessoa, `tenant_id` vem do org resolvido pela URL
+
+### 5. Hooks (useIrpf, useIrpfDocuments)
+
+- Recebem `tenantId` (resolvido pela pagina a partir do slug)
+- Todas as queries filtram por `tenant_id`
+
+### 6. RLS
+
+As policies existentes ja usam `tenant_id` nas tabelas `irpf_cases`, `irpf_people` e `irpf_documents`. As policies de modulo precisam ser atualizadas para aceitar os novos slugs `irpf-pg` e `irpf-contmax` alem de `irpf`:
 
 ```sql
-ALTER TABLE empresas 
-  ADD COLUMN numero_questor_confirmado boolean NOT NULL DEFAULT false;
-
--- Marcar TODAS as empresas existentes como confirmadas
-UPDATE empresas SET numero_questor_confirmado = true;
+-- Atualizar policies de INSERT/UPDATE/DELETE para aceitar os 3 slugs
+has_module_edit_access(auth.uid(), 'irpf') 
+OR has_module_edit_access(auth.uid(), 'irpf-pg')
+OR has_module_edit_access(auth.uid(), 'irpf-contmax')
 ```
 
-Resultado: empresas existentes nao aparecem no filtro. Apenas novas synced (que entrarao com `false`) aparecerao.
+Mesma logica para `has_module_access` nas policies de SELECT/INSERT.
 
-### 2. Sync functions -- setar `false` para novas empresas
+### 7. Storage bucket
 
-Nos arquivos `supabase/functions/sync-acessorias/index.ts` e `supabase/functions/sync-acessorias-cron/index.ts`, adicionar `numero_questor_confirmado: false` no INSERT de novas empresas. No UPDATE de empresas existentes, NAO alterar esse campo (para nao resetar empresas ja confirmadas).
+Manter o plano original: bucket `irpf-docs` privado, path `tenant/{tenant_id}/case/{case_id}/{doc_type}/{uuid}.{ext}`. As storage policies tambem precisam aceitar os 3 slugs.
 
-### 3. Tipo TypeScript -- `src/types/fiscal.ts`
+## Estrutura de Arquivos (mesma do plano anterior)
 
-Adicionar na interface `Empresa`:
-
-```typescript
-numeroQuestorConfirmado?: boolean;
+```text
+src/
+  types/irpf.ts
+  hooks/useIrpf.ts
+  hooks/useIrpfDocuments.ts
+  pages/Irpf.tsx                         -- recebe orgSlug da URL
+  pages/IrpfDetalhe.tsx                  -- recebe orgSlug + caseId da URL
+  components/irpf/
+    IrpfDashboardCards.tsx
+    IrpfDeclaracoesTable.tsx
+    IrpfPessoasTable.tsx
+    IrpfNovaPessoaDialog.tsx
+    IrpfDocumentChecklist.tsx
+    IrpfDependentesEditor.tsx
+    IrpfInformacoesContribuinte.tsx
 ```
 
-### 4. Hook -- `src/hooks/useEmpresas.ts`
+## Arquivos Modificados
 
-- Adicionar `numero_questor_confirmado` na string COLUMNS
-- No `rowToEmpresa`: mapear `row.numero_questor_confirmado` para `numeroQuestorConfirmado`
-- No `empresaToRow`: mapear `empresa.numeroQuestorConfirmado` para `numero_questor_confirmado`
+1. `src/App.tsx` -- rotas `/irpf/:orgSlug` e `/irpf/:orgSlug/:caseId`
+2. `src/pages/Portal.tsx` -- MODULE_ROUTES com `irpf-pg` e `irpf-contmax`
 
-### 5. Formulario -- `src/components/EmpresaFormDialog.tsx`
+## Migracoes SQL
 
-Quando o usuario salvar/editar uma empresa, enviar `numeroQuestorConfirmado: true` no objeto de dados. Isso garante que ao editar o numero, a empresa sai do filtro.
+1. Criar bucket `irpf-docs` + storage policies (aceitar slugs irpf, irpf-pg, irpf-contmax)
+2. Atualizar RLS policies de irpf_cases, irpf_people, irpf_documents para aceitar os novos slugs
 
-### 6. Filtro -- `src/pages/Clientes.tsx`
+## Dados (via insert tool)
 
-Trocar:
+1. Inserir modulos `irpf-pg` e `irpf-contmax` na tabela `modules`
+2. Desativar modulo `irpf` generico
 
-```typescript
-const matchesNumero = !semNumeroFilter || e.externalSource === 'acessorias';
-```
+## Ordem de Implementacao
 
-Para:
+1. SQL: bucket storage + atualizar RLS policies
+2. Dados: inserir modulos irpf-pg/irpf-contmax
+3. Tipos TypeScript
+4. Hooks
+5. Componentes
+6. Paginas
+7. Roteamento (App.tsx, Portal.tsx)
 
-```typescript
-const matchesNumero = !semNumeroFilter || (e.externalSource === 'acessorias' && !e.numeroQuestorConfirmado);
-```
+## Resumo da Diferenca vs Plano Anterior
 
-## Resultado esperado
-
-- Empresas existentes (synced ou manuais): NAO aparecem no filtro (todas marcadas `true`)
-- Nova empresa vinda do sync: APARECE no filtro (`false` por default)
-- Usuario edita numero da empresa synced: some do filtro (flag vira `true`)
-- Empresas manuais: nunca aparecem (sem `externalSource`)
-
-## Arquivos afetados
-
-1. Nova migracao SQL
-2. `supabase/functions/sync-acessorias/index.ts`
-3. `supabase/functions/sync-acessorias-cron/index.ts`
-4. `src/types/fiscal.ts`
-5. `src/hooks/useEmpresas.ts`
-6. `src/components/EmpresaFormDialog.tsx`
-7. `src/pages/Clientes.tsx`
-
+| Aspecto | Plano anterior | Plano atualizado |
+|---|---|---|
+| Rota | `/irpf` | `/irpf/:orgSlug` |
+| Modulo | 1 (`irpf`) | 2 (`irpf-pg`, `irpf-contmax`) |
+| Seletor org | Dropdown no topo | Vem da URL |
+| Permissao | `useModulePermissions("irpf")` | `useModulePermissions(`irpf-${orgSlug}`)` |
+| Visibilidade | Todos veem tudo | Colaborador ve so seu org |
+| Tab "Nova Pessoa" PG | Sempre visivel | So se orgSlug === 'pg' |
