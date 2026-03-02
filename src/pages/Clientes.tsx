@@ -91,7 +91,7 @@ export default function Clientes() {
       }
     }
 
-    const matchesNumero = !semNumeroFilter || e.externalSource === 'acessorias';
+    const matchesNumero = !semNumeroFilter || e.numero === 0;
     return matchesSearch && matchesRegime && matchesDataCadastro && matchesNumero;
   });
 
