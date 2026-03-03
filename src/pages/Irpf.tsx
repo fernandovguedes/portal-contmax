@@ -100,6 +100,7 @@ export default function Irpf() {
                   canEdit={canEdit}
                   orgSlug={orgSlug!}
                   onInlineUpdate={updateCaseInline}
+                  showResponsavel={orgSlug !== "contmax"}
                 />
               </TabsContent>
 
