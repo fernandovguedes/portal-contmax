@@ -52,9 +52,10 @@ export function IrpfDeclaracoesTable({ cases, docCounts, canEdit, orgSlug, onInl
         </div>
         <Select value={origemFilter} onValueChange={setOrigemFilter}>
           <SelectTrigger className="w-[130px]"><SelectValue placeholder="Origem" /></SelectTrigger>
-          <SelectContent>
+           <SelectContent>
             <SelectItem value="todos">Todas Origens</SelectItem>
             <SelectItem value="PG">P&G</SelectItem>
+            <SelectItem value="CONTMAX">Contmax</SelectItem>
             <SelectItem value="AVULSO">Avulso</SelectItem>
           </SelectContent>
         </Select>
@@ -107,8 +108,8 @@ export function IrpfDeclaracoesTable({ cases, docCounts, canEdit, orgSlug, onInl
                   <TableCell className="font-medium">{c.personNome}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{c.personCpf}</TableCell>
                   <TableCell>
-                    <Badge variant={c.personSource === "PG" ? "default" : "secondary"} className="text-[10px]">
-                      {c.personSource === "PG" ? "P&G" : "Avulso"}
+                    <Badge variant={c.personSource === "AVULSO" ? "secondary" : "default"} className="text-[10px]">
+                      {c.personSource === "PG" ? "P&G" : c.personSource === "CONTMAX" ? "Contmax" : "Avulso"}
                     </Badge>
                   </TableCell>
                   <TableCell>
