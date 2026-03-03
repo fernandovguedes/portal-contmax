@@ -16,6 +16,8 @@ import QualidadeAtendimento from "./pages/QualidadeAtendimento";
 import OnecodeContacts from "./pages/OnecodeContacts";
 import Integracoes from "./pages/Integracoes";
 import IntegracaoDetalhe from "./pages/IntegracaoDetalhe";
+import Irpf from "./pages/Irpf";
+import IrpfDetalhe from "./pages/IrpfDetalhe";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -52,6 +54,8 @@ const App = () => (
             <Route path="/qualidade-atendimento" element={<ProtectedRoute><QualidadeAtendimento /></ProtectedRoute>} />
             <Route path="/integracoes" element={<ProtectedRoute><Integracoes /></ProtectedRoute>} />
             <Route path="/integracoes/:slug" element={<ProtectedRoute><IntegracaoDetalhe /></ProtectedRoute>} />
+            <Route path="/irpf/:orgSlug" element={<ProtectedRoute><Irpf /></ProtectedRoute>} />
+            <Route path="/irpf/:orgSlug/:caseId" element={<ProtectedRoute><IrpfDetalhe /></ProtectedRoute>} />
             <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
             <Route path="/admin/onecode-contacts" element={<ProtectedRoute><OnecodeContacts /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
