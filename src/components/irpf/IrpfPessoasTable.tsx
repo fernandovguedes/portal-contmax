@@ -4,15 +4,22 @@ import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import type { IrpfPerson, IrpfCase } from "@/types/irpf";
 
+function origemBadge(source: string, orgSlug: string) {
+  if (source === "AVULSO") return { label: "Avulso", className: "", variant: "secondary" as const };
+  if (orgSlug === "contmax") return { label: "Contmax", className: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300", variant: undefined };
+  return { label: "P&G", className: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300", variant: undefined };
+}
+
 interface Props {
   people: IrpfPerson[];
   cases: IrpfCase[];
   anoBase: number;
   canEdit: boolean;
+  orgSlug: string;
   onCreateCase: (personId: string) => void;
 }
 
-export function IrpfPessoasTable({ people, cases, anoBase, canEdit, onCreateCase }: Props) {
+export function IrpfPessoasTable({ people, cases, anoBase, canEdit, orgSlug, onCreateCase }: Props) {
   const casePersonIds = new Set(cases.map(c => c.irpfPersonId));
 
   return (
@@ -43,9 +50,9 @@ export function IrpfPessoasTable({ people, cases, anoBase, canEdit, onCreateCase
                 <TableCell className="font-medium">{p.nome}</TableCell>
                 <TableCell className="text-sm text-muted-foreground">{p.cpf}</TableCell>
                 <TableCell>
-                  <Badge variant={p.source === "AVULSO" ? "secondary" : "default"} className="text-[10px]">
-                    {p.source === "PG" ? "P&G" : p.source === "CONTMAX" ? "Contmax" : "Avulso"}
-                  </Badge>
+                  {(() => { const ob = origemBadge(p.source, orgSlug); return (
+                    <Badge variant={ob.variant || "default"} className={`text-[10px] ${ob.className}`}>{ob.label}</Badge>
+                  ); })()}
                 </TableCell>
                 <TableCell className="text-sm">{p.empresaNome || "—"}</TableCell>
                 <TableCell className="text-sm text-muted-foreground">
