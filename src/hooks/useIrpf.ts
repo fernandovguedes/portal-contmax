@@ -150,6 +150,7 @@ export function useIrpf(tenantId: string | undefined, anoBase: number) {
         tenant_id: tenantId,
         irpf_person_id: personId,
         ano_base: anoBase,
+        status: "solicitar",
       })
       .select("id")
       .single();
@@ -303,6 +304,7 @@ export function useIrpf(tenantId: string | undefined, anoBase: number) {
           tenant_id: tenantId,
           irpf_person_id: personId,
           ano_base: anoBase,
+          status: "solicitar",
         }));
 
         const { data: casesInserted, error: caseErr } = await supabase

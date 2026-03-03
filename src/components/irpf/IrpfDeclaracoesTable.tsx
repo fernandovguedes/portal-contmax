@@ -87,7 +87,7 @@ export function IrpfDeclaracoesTable({ cases, docCounts, canEdit, orgSlug, onInl
               <TableHead className="w-28">Responsável</TableHead>
               <TableHead className="w-28">Valor</TableHead>
               <TableHead className="w-28">Data Pgto</TableHead>
-              <TableHead className="w-36">Status</TableHead>
+              <TableHead className="w-40">Status</TableHead>
               <TableHead className="w-16 text-center">Docs</TableHead>
               <TableHead className="w-16">Ações</TableHead>
             </TableRow>
@@ -150,18 +150,18 @@ export function IrpfDeclaracoesTable({ cases, docCounts, canEdit, orgSlug, onInl
                   <TableCell>
                     {canEdit ? (
                       <Select value={c.status} onValueChange={v => onInlineUpdate(c.id, "status", v)}>
-                        <SelectTrigger className="h-7 text-xs w-full">
-                          <Badge className={`${sc.className} text-[10px]`}>{sc.label}</Badge>
+                        <SelectTrigger className="h-7 text-xs w-40">
+                          <Badge className={`${sc.className} text-[10px] whitespace-nowrap`}>{sc.label}</Badge>
                         </SelectTrigger>
                         <SelectContent>
                           {Object.entries(STATUS_CONFIG).map(([k, v]) => (
                             <SelectItem key={k} value={k}>
-                              <Badge className={`${v.className} text-[10px]`}>{v.label}</Badge>
+                              <Badge className={`${v.className} text-[10px] whitespace-nowrap`}>{v.label}</Badge>
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
-                    ) : <Badge className={`${sc.className} text-[10px]`}>{sc.label}</Badge>}
+                    ) : <Badge className={`${sc.className} text-[10px] whitespace-nowrap`}>{sc.label}</Badge>}
                   </TableCell>
                   <TableCell className="text-center">
                     <div className="flex items-center justify-center gap-1">
