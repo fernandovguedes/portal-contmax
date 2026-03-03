@@ -20,7 +20,7 @@ export default function Irpf() {
   const { canEdit, loading: permLoading } = useModulePermissions(`irpf-${orgSlug}`);
 
   const [orgInfo, setOrgInfo] = useState<{ id: string; nome: string } | null>(null);
-  const anoBase = 2026;
+  const anoBase = 2025;
   const [novaPessoaOpen, setNovaPessoaOpen] = useState(false);
   const [importarOpen, setImportarOpen] = useState(false);
 
