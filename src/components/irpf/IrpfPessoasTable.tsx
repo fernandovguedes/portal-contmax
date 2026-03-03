@@ -43,8 +43,8 @@ export function IrpfPessoasTable({ people, cases, anoBase, canEdit, onCreateCase
                 <TableCell className="font-medium">{p.nome}</TableCell>
                 <TableCell className="text-sm text-muted-foreground">{p.cpf}</TableCell>
                 <TableCell>
-                  <Badge variant={p.source === "PG" ? "default" : "secondary"} className="text-[10px]">
-                    {p.source === "PG" ? "P&G" : "Avulso"}
+                  <Badge variant={p.source === "AVULSO" ? "secondary" : "default"} className="text-[10px]">
+                    {p.source === "PG" ? "P&G" : p.source === "CONTMAX" ? "Contmax" : "Avulso"}
                   </Badge>
                 </TableCell>
                 <TableCell className="text-sm">{p.empresaNome || "—"}</TableCell>

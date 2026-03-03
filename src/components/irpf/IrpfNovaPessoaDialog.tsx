@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Search, Plus, UserPlus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import type { IrpfSource } from "@/types/irpf";
 
 interface Props {
   open: boolean;
@@ -15,7 +16,7 @@ interface Props {
   orgSlug: string;
   tenantId: string;
   onAddPerson: (data: {
-    nome: string; cpf: string; source: "PG" | "AVULSO";
+    nome: string; cpf: string; source: IrpfSource;
     email?: string; telefone?: string;
     pgEmpresaId?: string; pgSocioCpf?: string;
   }) => Promise<any>;
@@ -74,7 +75,7 @@ export function IrpfNovaPessoaDialog({ open, onOpenChange, orgSlug, tenantId, on
     await onAddPerson({
       nome: s.socio_nome,
       cpf: s.socio_cpf,
-      source: "PG",
+      source: orgSlug === "contmax" ? "CONTMAX" : "PG",
       pgEmpresaId: s.empresa_id,
       pgSocioCpf: s.socio_cpf,
     });

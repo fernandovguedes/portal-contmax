@@ -1,5 +1,5 @@
 export type IrpfStatus = "aguardando_docs" | "em_analise" | "em_andamento" | "finalizado" | "entregue";
-export type IrpfSource = "PG" | "AVULSO";
+export type IrpfSource = "PG" | "CONTMAX" | "AVULSO";
 export type IrpfRegime = "completa" | "simplificada";
 
 export interface IrpfDependente {
