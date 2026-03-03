@@ -187,6 +187,7 @@ export default function IrpfDetalhe() {
                 </Select>
               </div>
 
+              {orgSlug !== "contmax" && (
               <div className="space-y-2">
                 <Label>Responsável</Label>
                 <Select value={form.responsavel || ""} onValueChange={v => updateField("responsavel", v)} disabled={!canEdit}>
@@ -196,6 +197,7 @@ export default function IrpfDetalhe() {
                   </SelectContent>
                 </Select>
               </div>
+              )}
 
               <div className="space-y-2">
                 <Label>Valor Cobrado (R$)</Label>

@@ -15,11 +15,12 @@ interface Props {
   canEdit: boolean;
   orgSlug: string;
   onInlineUpdate: (caseId: string, field: string, value: any) => void;
+  showResponsavel?: boolean;
 }
 
 const PAGE_SIZE = 30;
 
-export function IrpfDeclaracoesTable({ cases, docCounts, canEdit, orgSlug, onInlineUpdate }: Props) {
+export function IrpfDeclaracoesTable({ cases, docCounts, canEdit, orgSlug, onInlineUpdate, showResponsavel = true }: Props) {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("todos");
@@ -68,6 +69,7 @@ export function IrpfDeclaracoesTable({ cases, docCounts, canEdit, orgSlug, onInl
             ))}
           </SelectContent>
         </Select>
+        {showResponsavel && (
         <Select value={responsavelFilter} onValueChange={setResponsavelFilter}>
           <SelectTrigger className="w-[130px]"><SelectValue placeholder="Responsável" /></SelectTrigger>
           <SelectContent>
@@ -75,6 +77,7 @@ export function IrpfDeclaracoesTable({ cases, docCounts, canEdit, orgSlug, onInl
             {RESPONSAVEIS.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
           </SelectContent>
         </Select>
+        )}
       </div>
 
       <div className="rounded-xl border bg-card overflow-x-auto shadow-sm table-zebra">
@@ -84,7 +87,7 @@ export function IrpfDeclaracoesTable({ cases, docCounts, canEdit, orgSlug, onInl
               <TableHead>Nome</TableHead>
               <TableHead>CPF</TableHead>
               <TableHead className="w-20">Origem</TableHead>
-              <TableHead className="w-28">Responsável</TableHead>
+              {showResponsavel && <TableHead className="w-28">Responsável</TableHead>}
               <TableHead className="w-28">Valor</TableHead>
               <TableHead className="w-28">Data Pgto</TableHead>
               <TableHead className="w-40">Status</TableHead>
@@ -95,7 +98,7 @@ export function IrpfDeclaracoesTable({ cases, docCounts, canEdit, orgSlug, onInl
           <TableBody>
             {paginated.length === 0 && (
               <TableRow>
-                <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">
+                <TableCell colSpan={showResponsavel ? 9 : 8} className="h-24 text-center text-muted-foreground">
                   Nenhuma declaração encontrada.
                 </TableCell>
               </TableRow>
@@ -112,6 +115,7 @@ export function IrpfDeclaracoesTable({ cases, docCounts, canEdit, orgSlug, onInl
                       {c.personSource === "PG" ? "P&G" : c.personSource === "CONTMAX" ? "Contmax" : "Avulso"}
                     </Badge>
                   </TableCell>
+                  {showResponsavel && (
                   <TableCell>
                     {canEdit ? (
                       <Select value={c.responsavel} onValueChange={v => onInlineUpdate(c.id, "responsavel", v)}>
@@ -122,6 +126,7 @@ export function IrpfDeclaracoesTable({ cases, docCounts, canEdit, orgSlug, onInl
                       </Select>
                     ) : <span className="text-sm">{c.responsavel}</span>}
                   </TableCell>
+                  )}
                   <TableCell>
                     {canEdit ? (
                       <Input
