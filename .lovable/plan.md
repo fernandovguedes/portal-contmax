@@ -1,129 +1,71 @@
 
-# Modulo IRPF -- Ajuste Multi-Tenant por Organizacao
 
-## Problema Identificado
+# Importacao em Massa de Socios para IRPF
 
-O plano original tinha um unico modulo "irpf" com um seletor de organizacao no topo da pagina. Isso nao funciona porque:
-- Usuarios colaboradores podem ter acesso apenas a PG OU Contmax
-- O controle de permissao via `useModulePermissions` precisa de um slug por org (como `clientes-pg` / `clientes-contmax`)
-- A rota precisa incluir o slug da org para que o sistema saiba de qual tenant estamos falando
+## Contexto
+
+A tabela `irpf_people` esta vazia. A view `pg_socios_view` tem:
+- **Contmax**: 423 registros (314 CPFs unicos)
+- **P&G**: 603 registros (531 CPFs unicos)
+
+Um mesmo socio pode aparecer em varias empresas. A constraint `unique(tenant_id, cpf)` impede duplicatas.
 
 ## Solucao
 
-Seguir o mesmo padrao de Clientes:
-- Rota: `/irpf/:orgSlug` (ex: `/irpf/pg`, `/irpf/contmax`)
-- Modulos separados: `irpf-pg` e `irpf-contmax` na tabela `modules`
-- Permissao: `useModulePermissions(`irpf-${orgSlug}`)`
-- Cada pessoa/case filtrado por `tenant_id` resolvido a partir do slug da URL
+Adicionar um botao **"Importar Socios"** na pagina IRPF (ao lado do botao "Nova Pessoa"). Ao clicar:
 
-## Alteracoes em Relacao ao Plano Anterior
+1. Mostra um dialog de confirmacao com a contagem de socios que serao importados
+2. Executa a importacao via SQL (INSERT ... ON CONFLICT DO NOTHING)
+3. Para cada CPF unico, pega o primeiro registro da view (nome, cpf, empresa_id)
+4. Cria `irpf_people` com `source = "PG"` ou `"CONTMAX"` conforme o orgSlug
+5. **Opcionalmente** cria `irpf_cases` para o ano selecionado (com round-robin de responsavel)
+6. Exibe toast com resultado (X pessoas importadas, Y ja existiam)
 
-### 1. Dados: Criar modulos irpf-pg e irpf-contmax
+## Implementacao
 
-Inserir na tabela `modules`:
-- `irpf-pg` (nome: "IRPF P&G", organizacao_id: P&G uuid, icone: FileText, ativo: true)
-- `irpf-contmax` (nome: "IRPF Contmax", organizacao_id: Contmax uuid, icone: FileText, ativo: true)
+### 1. Botao na pagina Irpf.tsx
 
-Atualizar ou desativar o modulo "irpf" generico existente (slug `irpf`).
+Adicionar botao "Importar Socios" ao lado de "Nova Pessoa", visivel apenas para quem tem `canEdit`.
 
-### 2. Roteamento
+### 2. Dialog de confirmacao (IrpfImportarSociosDialog.tsx)
 
-No `App.tsx`:
-- `/irpf/:orgSlug` -- pagina principal (lista declaracoes/pessoas)
-- `/irpf/:orgSlug/:caseId` -- detalhe da declaracao
+- Ao abrir, consulta `pg_socios_view` filtrada pelo `tenant_id` e conta CPFs unicos que NAO existem em `irpf_people`
+- Checkbox: "Criar declaracoes para [ano selecionado]" (marcado por padrao)
+- Botao "Importar" com loading state
+- Progress feedback durante a importacao
 
-No `Portal.tsx` (MODULE_ROUTES):
-- `"irpf-pg": "/irpf/pg"`
-- `"irpf-contmax": "/irpf/contmax"`
+### 3. Logica de importacao (no hook useIrpf.ts)
 
-### 3. Pagina principal (src/pages/Irpf.tsx)
-
-- Extrair `orgSlug` da URL via `useParams`
-- Resolver `tenant_id` a partir do slug (query `organizacoes` por slug, mesmo padrao de Clientes.tsx)
-- Usar `useModulePermissions(`irpf-${orgSlug}`)` para controle de edicao
-- **Remover** o seletor de organizacao do topo (a org ja vem da URL)
-- Manter seletor de ano-base
-
-### 4. Dialog "Nova Pessoa"
-
-- Tab "Cliente P&G" so aparece se `orgSlug === 'pg'` (busca pg_socios_view filtrada pelo tenant)
-- Tab "Cliente Contmax" so aparece se `orgSlug === 'contmax'` (busca empresas da Contmax)
-- Tab "Avulso" sempre disponivel
-- Ao criar pessoa, `tenant_id` vem do org resolvido pela URL
-
-### 5. Hooks (useIrpf, useIrpfDocuments)
-
-- Recebem `tenantId` (resolvido pela pagina a partir do slug)
-- Todas as queries filtram por `tenant_id`
-
-### 6. RLS
-
-As policies existentes ja usam `tenant_id` nas tabelas `irpf_cases`, `irpf_people` e `irpf_documents`. As policies de modulo precisam ser atualizadas para aceitar os novos slugs `irpf-pg` e `irpf-contmax` alem de `irpf`:
-
-```sql
--- Atualizar policies de INSERT/UPDATE/DELETE para aceitar os 3 slugs
-has_module_edit_access(auth.uid(), 'irpf') 
-OR has_module_edit_access(auth.uid(), 'irpf-pg')
-OR has_module_edit_access(auth.uid(), 'irpf-contmax')
-```
-
-Mesma logica para `has_module_access` nas policies de SELECT/INSERT.
-
-### 7. Storage bucket
-
-Manter o plano original: bucket `irpf-docs` privado, path `tenant/{tenant_id}/case/{case_id}/{doc_type}/{uuid}.{ext}`. As storage policies tambem precisam aceitar os 3 slugs.
-
-## Estrutura de Arquivos (mesma do plano anterior)
+Nova funcao `bulkImportFromSocios`:
 
 ```text
-src/
-  types/irpf.ts
-  hooks/useIrpf.ts
-  hooks/useIrpfDocuments.ts
-  pages/Irpf.tsx                         -- recebe orgSlug da URL
-  pages/IrpfDetalhe.tsx                  -- recebe orgSlug + caseId da URL
-  components/irpf/
-    IrpfDashboardCards.tsx
-    IrpfDeclaracoesTable.tsx
-    IrpfPessoasTable.tsx
-    IrpfNovaPessoaDialog.tsx
-    IrpfDocumentChecklist.tsx
-    IrpfDependentesEditor.tsx
-    IrpfInformacoesContribuinte.tsx
+1. Buscar todos os registros de pg_socios_view para o tenant
+2. Agrupar por CPF (pegar primeiro registro de cada CPF unico)
+3. Para cada CPF unico:
+   a. INSERT em irpf_people (ON CONFLICT tenant_id+cpf ignorar)
+   b. Se checkbox de criar cases marcado: INSERT em irpf_cases
+4. Retornar contagem de criados vs ignorados
 ```
 
-## Arquivos Modificados
+Como o Supabase JS nao tem ON CONFLICT nativo, a abordagem sera:
+- Buscar CPFs ja existentes em irpf_people para o tenant
+- Filtrar apenas os novos
+- Fazer batch insert dos novos (em lotes de 50)
+- Se criar cases, fazer batch insert dos cases
 
-1. `src/App.tsx` -- rotas `/irpf/:orgSlug` e `/irpf/:orgSlug/:caseId`
-2. `src/pages/Portal.tsx` -- MODULE_ROUTES com `irpf-pg` e `irpf-contmax`
+### 4. Arquivos modificados
 
-## Migracoes SQL
+| Arquivo | Alteracao |
+|---|---|
+| `src/pages/Irpf.tsx` | Adicionar botao "Importar Socios" e dialog |
+| `src/hooks/useIrpf.ts` | Adicionar funcao `bulkImportFromSocios` |
+| `src/components/irpf/IrpfImportarSociosDialog.tsx` | **Novo** - dialog de importacao |
 
-1. Criar bucket `irpf-docs` + storage policies (aceitar slugs irpf, irpf-pg, irpf-contmax)
-2. Atualizar RLS policies de irpf_cases, irpf_people, irpf_documents para aceitar os novos slugs
+## Detalhes Tecnicos
 
-## Dados (via insert tool)
+- Importacao em lotes de 50 registros para evitar timeout
+- Source definido pelo orgSlug: `pg` -> `"PG"`, `contmax` -> `"CONTMAX"`
+- `pg_empresa_id` e `pg_socio_cpf` preenchidos para manter o vinculo com a empresa
+- Para socios com multiplas empresas, sera usado o primeiro registro (a pessoa pode estar vinculada a mais de uma empresa, mas na tabela irpf_people so precisa de uma referencia)
+- O round-robin de responsavel funciona automaticamente via trigger no banco
 
-1. Inserir modulos `irpf-pg` e `irpf-contmax` na tabela `modules`
-2. Desativar modulo `irpf` generico
-
-## Ordem de Implementacao
-
-1. SQL: bucket storage + atualizar RLS policies
-2. Dados: inserir modulos irpf-pg/irpf-contmax
-3. Tipos TypeScript
-4. Hooks
-5. Componentes
-6. Paginas
-7. Roteamento (App.tsx, Portal.tsx)
-
-## Resumo da Diferenca vs Plano Anterior
-
-| Aspecto | Plano anterior | Plano atualizado |
-|---|---|---|
-| Rota | `/irpf` | `/irpf/:orgSlug` |
-| Modulo | 1 (`irpf`) | 2 (`irpf-pg`, `irpf-contmax`) |
-| Seletor org | Dropdown no topo | Vem da URL |
-| Permissao | `useModulePermissions("irpf")` | `useModulePermissions(`irpf-${orgSlug}`)` |
-| Visibilidade | Todos veem tudo | Colaborador ve so seu org |
-| Tab "Nova Pessoa" PG | Sempre visivel | So se orgSlug === 'pg' |
