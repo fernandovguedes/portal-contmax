@@ -113,6 +113,7 @@ export default function Irpf() {
                     cases={cases}
                     anoBase={anoBase}
                     canEdit={canEdit}
+                    orgSlug={orgSlug!}
                     onCreateCase={createCase}
                   />
                 )}

@@ -9,6 +9,12 @@ import { useNavigate } from "react-router-dom";
 import type { IrpfCase, IrpfStatus } from "@/types/irpf";
 import { STATUS_CONFIG, RESPONSAVEIS } from "@/types/irpf";
 
+function origemBadge(source: string, orgSlug: string) {
+  if (source === "AVULSO") return { label: "Avulso", className: "", variant: "secondary" as const };
+  if (orgSlug === "contmax") return { label: "Contmax", className: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300", variant: undefined };
+  return { label: "P&G", className: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300", variant: undefined };
+}
+
 interface Props {
   cases: IrpfCase[];
   docCounts: Record<string, number>;
@@ -55,9 +61,9 @@ export function IrpfDeclaracoesTable({ cases, docCounts, canEdit, orgSlug, onInl
           <SelectTrigger className="w-[130px]"><SelectValue placeholder="Origem" /></SelectTrigger>
            <SelectContent>
             <SelectItem value="todos">Todas Origens</SelectItem>
-            <SelectItem value="PG">P&G</SelectItem>
-            <SelectItem value="CONTMAX">Contmax</SelectItem>
-            <SelectItem value="AVULSO">Avulso</SelectItem>
+            <SelectItem value="PG">{orgSlug === "contmax" ? "Contmax" : "P&G"}</SelectItem>
+             <SelectItem value="CONTMAX">{orgSlug === "contmax" ? "Contmax" : "Contmax"}</SelectItem>
+             <SelectItem value="AVULSO">Avulso</SelectItem>
           </SelectContent>
         </Select>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -111,9 +117,9 @@ export function IrpfDeclaracoesTable({ cases, docCounts, canEdit, orgSlug, onInl
                   <TableCell className="font-medium">{c.personNome}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{c.personCpf}</TableCell>
                   <TableCell>
-                    <Badge variant={c.personSource === "AVULSO" ? "secondary" : "default"} className="text-[10px]">
-                      {c.personSource === "PG" ? "P&G" : c.personSource === "CONTMAX" ? "Contmax" : "Avulso"}
-                    </Badge>
+                    {(() => { const ob = origemBadge(c.personSource || "", orgSlug); return (
+                      <Badge variant={ob.variant || "default"} className={`text-[10px] ${ob.className}`}>{ob.label}</Badge>
+                    ); })()}
                   </TableCell>
                   {showResponsavel && (
                   <TableCell>
