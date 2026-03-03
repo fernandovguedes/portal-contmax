@@ -1,4 +1,4 @@
-export type IrpfStatus = "aguardando_docs" | "em_analise" | "em_andamento" | "finalizado" | "entregue";
+export type IrpfStatus = "solicitar" | "aguardando_docs" | "em_andamento" | "entregue" | "aguardando_pgto" | "finalizado";
 export type IrpfSource = "PG" | "CONTMAX" | "AVULSO";
 export type IrpfRegime = "completa" | "simplificada";
 
@@ -79,11 +79,12 @@ export const DOC_TYPES = [
 ] as const;
 
 export const STATUS_CONFIG: Record<IrpfStatus, { label: string; className: string }> = {
+  solicitar: { label: "Solicitar", className: "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300" },
   aguardando_docs: { label: "Aguardando Docs", className: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300" },
-  em_analise: { label: "Em Análise", className: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300" },
   em_andamento: { label: "Em Andamento", className: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300" },
-  finalizado: { label: "Finalizado", className: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300" },
   entregue: { label: "Entregue", className: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300" },
+  aguardando_pgto: { label: "Aguardando Pgto", className: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300" },
+  finalizado: { label: "Finalizado", className: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300" },
 };
 
 export const RESPONSAVEIS = ["Grazi", "Pedro"] as const;
