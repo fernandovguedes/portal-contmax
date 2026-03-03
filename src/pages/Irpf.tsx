@@ -6,7 +6,6 @@ import { useIrpf } from "@/hooks/useIrpf";
 import { AppHeader } from "@/components/AppHeader";
 import { LoadingSkeleton } from "@/components/LoadingSkeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Plus, Upload } from "lucide-react";
 import { IrpfDashboardCards } from "@/components/irpf/IrpfDashboardCards";
@@ -16,14 +15,12 @@ import { IrpfNovaPessoaDialog } from "@/components/irpf/IrpfNovaPessoaDialog";
 import { IrpfImportarSociosDialog } from "@/components/irpf/IrpfImportarSociosDialog";
 import { toast } from "@/hooks/use-toast";
 
-const ANOS = [2024, 2025, 2026];
-
 export default function Irpf() {
   const { orgSlug } = useParams<{ orgSlug: string }>();
   const { canEdit, loading: permLoading } = useModulePermissions(`irpf-${orgSlug}`);
 
   const [orgInfo, setOrgInfo] = useState<{ id: string; nome: string } | null>(null);
-  const [anoBase, setAnoBase] = useState(2025);
+  const anoBase = 2026;
   const [novaPessoaOpen, setNovaPessoaOpen] = useState(false);
   const [importarOpen, setImportarOpen] = useState(false);
 
@@ -62,14 +59,6 @@ export default function Irpf() {
         breadcrumbs={[{ label: "Portal", href: "/" }, { label: `IRPF ${orgInfo.nome}` }]}
         actions={
           <div className="flex items-center gap-2">
-            <Select value={String(anoBase)} onValueChange={v => setAnoBase(Number(v))}>
-              <SelectTrigger className="w-[100px] bg-white/10 border-white/20 text-primary-foreground">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {ANOS.map(a => <SelectItem key={a} value={String(a)}>{a}</SelectItem>)}
-              </SelectContent>
-            </Select>
             {canEdit && (
               <>
                 <Button variant="outline" onClick={() => setImportarOpen(true)} className="bg-white/10 border-white/20 text-primary-foreground hover:bg-white/20">
