@@ -41,9 +41,16 @@ export default function Irpf() {
   }, [orgSlug]);
 
   const {
-    people, cases, docCounts, loading,
+    people, cases, docCounts, loading, peopleLoading,
+    fetchPeople,
     createPersonAndCase, createCase, updateCaseInline, bulkImportFromSocios,
   } = useIrpf(orgInfo?.id, anoBase);
+
+  const handleTabChange = (value: string) => {
+    if (value === "pessoas") {
+      fetchPeople();
+    }
+  };
 
   if (!orgInfo || permLoading) {
     return <LoadingSkeleton variant="portal" />;
@@ -80,7 +87,7 @@ export default function Irpf() {
           <>
             <IrpfDashboardCards cases={cases} />
 
-            <Tabs defaultValue="declaracoes">
+            <Tabs defaultValue="declaracoes" onValueChange={handleTabChange}>
               <TabsList>
                 <TabsTrigger value="declaracoes">Declarações ({cases.length})</TabsTrigger>
                 <TabsTrigger value="pessoas">Pessoas ({people.length})</TabsTrigger>
@@ -97,13 +104,17 @@ export default function Irpf() {
               </TabsContent>
 
               <TabsContent value="pessoas" className="mt-4">
-                <IrpfPessoasTable
-                  people={people}
-                  cases={cases}
-                  anoBase={anoBase}
-                  canEdit={canEdit}
-                  onCreateCase={createCase}
-                />
+                {peopleLoading ? (
+                  <LoadingSkeleton variant="portal" />
+                ) : (
+                  <IrpfPessoasTable
+                    people={people}
+                    cases={cases}
+                    anoBase={anoBase}
+                    canEdit={canEdit}
+                    onCreateCase={createCase}
+                  />
+                )}
               </TabsContent>
             </Tabs>
           </>

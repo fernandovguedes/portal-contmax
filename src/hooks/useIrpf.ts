@@ -55,59 +55,68 @@ export function useIrpf(tenantId: string | undefined, anoBase: number) {
   const [cases, setCases] = useState<IrpfCase[]>([]);
   const [docCounts, setDocCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
+  const [peopleLoading, setPeopleLoading] = useState(false);
+  const [peopleFetched, setPeopleFetched] = useState(false);
 
-  const fetchAll = useCallback(async () => {
+  // Fetch cases with inline doc count (eliminates separate doc query)
+  const fetchCases = useCallback(async () => {
     if (!tenantId || !user) return;
     setLoading(true);
 
-    const [peopleRes, casesRes] = await Promise.all([
-      supabase
-        .from("irpf_people")
-        .select("*, empresas:pg_empresa_id(nome)")
-        .eq("tenant_id", tenantId)
-        .eq("ativo", true)
-        .order("nome"),
-      supabase
-        .from("irpf_cases")
-        .select("*, irpf_people!inner(nome, cpf, source, pg_empresa_id, empresas:pg_empresa_id(nome))")
-        .eq("tenant_id", tenantId)
-        .eq("ano_base", anoBase)
-        .order("created_at", { ascending: false }),
-    ]);
+    const { data, error } = await supabase
+      .from("irpf_cases")
+      .select("*, irpf_people!inner(nome, cpf, source, pg_empresa_id, empresas:pg_empresa_id(nome)), irpf_documents(count)")
+      .eq("tenant_id", tenantId)
+      .eq("ano_base", anoBase)
+      .order("created_at", { ascending: false });
 
-    if (peopleRes.error) {
-      toast({ title: "Erro ao carregar pessoas", description: peopleRes.error.message, variant: "destructive" });
+    if (error) {
+      toast({ title: "Erro ao carregar declarações", description: error.message, variant: "destructive" });
     } else {
-      setPeople((peopleRes.data || []).map(rowToPerson));
-    }
-
-    if (casesRes.error) {
-      toast({ title: "Erro ao carregar declarações", description: casesRes.error.message, variant: "destructive" });
-    } else {
-      setCases((casesRes.data || []).map(rowToCase));
-    }
-
-    // doc counts
-    if (casesRes.data && casesRes.data.length > 0) {
-      const caseIds = casesRes.data.map((c: any) => c.id);
-      const { data: docs } = await supabase
-        .from("irpf_documents")
-        .select("irpf_case_id")
-        .in("irpf_case_id", caseIds);
+      const rows = data || [];
+      setCases(rows.map(rowToCase));
       
+      // Extract doc counts from the inline aggregation
       const counts: Record<string, number> = {};
-      (docs || []).forEach((d: any) => {
-        counts[d.irpf_case_id] = (counts[d.irpf_case_id] || 0) + 1;
+      rows.forEach((r: any) => {
+        const cnt = r.irpf_documents?.[0]?.count ?? 0;
+        counts[r.id] = cnt;
       });
       setDocCounts(counts);
-    } else {
-      setDocCounts({});
     }
 
     setLoading(false);
   }, [tenantId, anoBase, user]);
 
-  useEffect(() => { fetchAll(); }, [fetchAll]);
+  // Lazy fetch people - only when requested
+  const fetchPeople = useCallback(async () => {
+    if (!tenantId || !user || peopleFetched) return;
+    setPeopleLoading(true);
+
+    const { data, error } = await supabase
+      .from("irpf_people")
+      .select("*, empresas:pg_empresa_id(nome)")
+      .eq("tenant_id", tenantId)
+      .eq("ativo", true)
+      .order("nome");
+
+    if (error) {
+      toast({ title: "Erro ao carregar pessoas", description: error.message, variant: "destructive" });
+    } else {
+      setPeople((data || []).map(rowToPerson));
+      setPeopleFetched(true);
+    }
+
+    setPeopleLoading(false);
+  }, [tenantId, user, peopleFetched]);
+
+  // Refetch all (used after mutations)
+  const fetchAll = useCallback(async () => {
+    setPeopleFetched(false);
+    await fetchCases();
+  }, [fetchCases]);
+
+  useEffect(() => { fetchCases(); }, [fetchCases]);
 
   const createPerson = useCallback(async (data: {
     nome: string; cpf: string; source: IrpfSource;
@@ -233,7 +242,6 @@ export function useIrpf(tenantId: string | undefined, anoBase: number) {
 
     const source: IrpfSource = orgSlug === "contmax" ? "CONTMAX" : "PG";
 
-    // 1. Fetch all socios from view
     const { data: socios, error: sociosErr } = await supabase
       .from("pg_socios_view")
       .select("socio_cpf, socio_nome, empresa_id")
@@ -244,7 +252,6 @@ export function useIrpf(tenantId: string | undefined, anoBase: number) {
       return { created: 0, skipped: 0, casesCreated: 0 };
     }
 
-    // 2. Deduplicate by CPF (first occurrence wins)
     const seen = new Set<string>();
     const unique: { cpf: string; nome: string; empresaId: string | null }[] = [];
     for (const s of socios) {
@@ -253,7 +260,6 @@ export function useIrpf(tenantId: string | undefined, anoBase: number) {
       unique.push({ cpf: s.socio_cpf, nome: s.socio_nome || "", empresaId: s.empresa_id });
     }
 
-    // 3. Get existing CPFs
     const { data: existing } = await supabase
       .from("irpf_people")
       .select("cpf")
@@ -265,7 +271,6 @@ export function useIrpf(tenantId: string | undefined, anoBase: number) {
       return { created: 0, skipped: unique.length, casesCreated: 0 };
     }
 
-    // 4. Batch insert people (chunks of 50)
     let created = 0;
     const insertedIds: string[] = [];
     const BATCH = 50;
@@ -295,7 +300,6 @@ export function useIrpf(tenantId: string | undefined, anoBase: number) {
       insertedIds.push(...(inserted || []).map(r => r.id));
     }
 
-    // 5. Optionally create cases
     let casesCreated = 0;
     if (opts.createCases && insertedIds.length > 0) {
       for (let i = 0; i < insertedIds.length; i += BATCH) {
@@ -330,7 +334,8 @@ export function useIrpf(tenantId: string | undefined, anoBase: number) {
   }, [tenantId, anoBase, user, fetchAll]);
 
   return {
-    people, cases, docCounts, loading, refetch: fetchAll,
+    people, cases, docCounts, loading, peopleLoading, refetch: fetchAll,
+    fetchPeople,
     createPerson, createCase, createPersonAndCase,
     updateCaseInline, updateCaseFull, bulkImportFromSocios,
   };
