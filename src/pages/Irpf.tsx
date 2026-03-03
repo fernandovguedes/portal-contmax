@@ -8,11 +8,12 @@ import { LoadingSkeleton } from "@/components/LoadingSkeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { Plus, Upload } from "lucide-react";
 import { IrpfDashboardCards } from "@/components/irpf/IrpfDashboardCards";
 import { IrpfDeclaracoesTable } from "@/components/irpf/IrpfDeclaracoesTable";
 import { IrpfPessoasTable } from "@/components/irpf/IrpfPessoasTable";
 import { IrpfNovaPessoaDialog } from "@/components/irpf/IrpfNovaPessoaDialog";
+import { IrpfImportarSociosDialog } from "@/components/irpf/IrpfImportarSociosDialog";
 import { toast } from "@/hooks/use-toast";
 
 const ANOS = [2024, 2025, 2026];
@@ -24,6 +25,7 @@ export default function Irpf() {
   const [orgInfo, setOrgInfo] = useState<{ id: string; nome: string } | null>(null);
   const [anoBase, setAnoBase] = useState(2025);
   const [novaPessoaOpen, setNovaPessoaOpen] = useState(false);
+  const [importarOpen, setImportarOpen] = useState(false);
 
   useEffect(() => {
     if (!orgSlug) return;
@@ -43,7 +45,7 @@ export default function Irpf() {
 
   const {
     people, cases, docCounts, loading,
-    createPersonAndCase, createCase, updateCaseInline,
+    createPersonAndCase, createCase, updateCaseInline, bulkImportFromSocios,
   } = useIrpf(orgInfo?.id, anoBase);
 
   if (!orgInfo || permLoading) {
@@ -69,9 +71,14 @@ export default function Irpf() {
               </SelectContent>
             </Select>
             {canEdit && (
-              <Button onClick={() => setNovaPessoaOpen(true)} className="bg-accent text-accent-foreground hover:bg-accent/90">
-                <Plus className="mr-1 h-4 w-4" /> Nova Pessoa
-              </Button>
+              <>
+                <Button variant="outline" onClick={() => setImportarOpen(true)} className="bg-white/10 border-white/20 text-primary-foreground hover:bg-white/20">
+                  <Upload className="mr-1 h-4 w-4" /> Importar Sócios
+                </Button>
+                <Button onClick={() => setNovaPessoaOpen(true)} className="bg-accent text-accent-foreground hover:bg-accent/90">
+                  <Plus className="mr-1 h-4 w-4" /> Nova Pessoa
+                </Button>
+              </>
             )}
           </div>
         }
@@ -120,6 +127,15 @@ export default function Irpf() {
         orgSlug={orgSlug!}
         tenantId={orgInfo.id}
         onAddPerson={createPersonAndCase}
+      />
+
+      <IrpfImportarSociosDialog
+        open={importarOpen}
+        onOpenChange={setImportarOpen}
+        tenantId={orgInfo.id}
+        orgSlug={orgSlug!}
+        anoBase={anoBase}
+        onImport={(opts) => bulkImportFromSocios(orgSlug!, opts)}
       />
     </div>
   );

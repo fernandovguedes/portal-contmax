@@ -224,9 +224,112 @@ export function useIrpf(tenantId: string | undefined, anoBase: number) {
     return true;
   }, [fetchAll]);
 
+  const bulkImportFromSocios = useCallback(async (
+    orgSlug: string,
+    opts: { createCases: boolean }
+  ): Promise<{ created: number; skipped: number; casesCreated: number }> => {
+    if (!tenantId || !user) return { created: 0, skipped: 0, casesCreated: 0 };
+
+    const source: IrpfSource = orgSlug === "contmax" ? "CONTMAX" : "PG";
+
+    // 1. Fetch all socios from view
+    const { data: socios, error: sociosErr } = await supabase
+      .from("pg_socios_view")
+      .select("socio_cpf, socio_nome, empresa_id")
+      .eq("tenant_id", tenantId);
+
+    if (sociosErr || !socios) {
+      toast({ title: "Erro ao buscar sócios", description: sociosErr?.message, variant: "destructive" });
+      return { created: 0, skipped: 0, casesCreated: 0 };
+    }
+
+    // 2. Deduplicate by CPF (first occurrence wins)
+    const seen = new Set<string>();
+    const unique: { cpf: string; nome: string; empresaId: string | null }[] = [];
+    for (const s of socios) {
+      if (!s.socio_cpf || seen.has(s.socio_cpf)) continue;
+      seen.add(s.socio_cpf);
+      unique.push({ cpf: s.socio_cpf, nome: s.socio_nome || "", empresaId: s.empresa_id });
+    }
+
+    // 3. Get existing CPFs
+    const { data: existing } = await supabase
+      .from("irpf_people")
+      .select("cpf")
+      .eq("tenant_id", tenantId);
+    const existingCpfs = new Set((existing || []).map(e => e.cpf));
+
+    const toInsert = unique.filter(u => !existingCpfs.has(u.cpf));
+    if (toInsert.length === 0) {
+      return { created: 0, skipped: unique.length, casesCreated: 0 };
+    }
+
+    // 4. Batch insert people (chunks of 50)
+    let created = 0;
+    const insertedIds: string[] = [];
+    const BATCH = 50;
+
+    for (let i = 0; i < toInsert.length; i += BATCH) {
+      const chunk = toInsert.slice(i, i + BATCH);
+      const rows = chunk.map(c => ({
+        tenant_id: tenantId,
+        nome: c.nome,
+        cpf: c.cpf,
+        source,
+        pg_empresa_id: c.empresaId || null,
+        pg_socio_cpf: c.cpf,
+        created_by: user.id,
+      }));
+
+      const { data: inserted, error: insertErr } = await supabase
+        .from("irpf_people")
+        .insert(rows)
+        .select("id");
+
+      if (insertErr) {
+        console.error("Batch insert error:", insertErr);
+        continue;
+      }
+      created += (inserted || []).length;
+      insertedIds.push(...(inserted || []).map(r => r.id));
+    }
+
+    // 5. Optionally create cases
+    let casesCreated = 0;
+    if (opts.createCases && insertedIds.length > 0) {
+      for (let i = 0; i < insertedIds.length; i += BATCH) {
+        const chunk = insertedIds.slice(i, i + BATCH);
+        const caseRows = chunk.map(personId => ({
+          tenant_id: tenantId,
+          irpf_person_id: personId,
+          ano_base: anoBase,
+        }));
+
+        const { data: casesInserted, error: caseErr } = await supabase
+          .from("irpf_cases")
+          .insert(caseRows)
+          .select("id");
+
+        if (caseErr) {
+          console.error("Batch cases error:", caseErr);
+          continue;
+        }
+        casesCreated += (casesInserted || []).length;
+      }
+    }
+
+    toast({
+      title: "Importação concluída",
+      description: `${created} pessoa(s) importada(s), ${unique.length - toInsert.length} já existia(m).`,
+    });
+
+    await fetchAll();
+    return { created, skipped: unique.length - toInsert.length, casesCreated };
+  }, [tenantId, anoBase, user, fetchAll]);
+
   return {
     people, cases, docCounts, loading, refetch: fetchAll,
     createPerson, createCase, createPersonAndCase,
-    updateCaseInline, updateCaseFull,
+    updateCaseInline, updateCaseFull, bulkImportFromSocios,
   };
 }
