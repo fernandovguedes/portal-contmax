@@ -1,42 +1,49 @@
 
 
-# Performance da Pagina IRPF - Diagnostico e Otimizacoes
+# Ajustes no Modulo IRPF
 
-## Diagnostico
+## 1. Remover coluna "Responsavel" do IRPF Contmax
 
-A pagina carrega **530 pessoas** e **530 declaracoes** (P&G) em 3 queries simultaneas. O volume atual nao e critico, mas ha otimizacoes simples que podem reduzir o tempo de carregamento.
+A tabela de declaracoes e o detalhe do IRPF Contmax nao terao a coluna/campo "Responsavel". Para isso:
 
-### Gargalos identificados
+**Arquivo: `src/components/irpf/IrpfDeclaracoesTable.tsx`**
+- Receber prop `showResponsavel` (default `true`)
+- Quando `false`, esconder a coluna "Responsavel" na tabela e o filtro de responsavel
 
-1. **Query de contagem de documentos**: apos carregar os cases, faz uma query `IN` com 530 IDs para contar documentos - essa query extra e desnecessaria se usarmos um count agregado no join
-2. **Carregamento de pessoas**: a aba "Pessoas" carrega todos os 530 registros mesmo sem estar visivel
-3. **Nenhum cache**: ao voltar para a pagina, tudo e recarregado do zero
+**Arquivo: `src/pages/Irpf.tsx`**
+- Passar `showResponsavel={orgSlug !== "contmax"}` para o componente
 
-## Plano de Otimizacao
+**Arquivo: `src/pages/IrpfDetalhe.tsx`**
+- Condicionar a exibicao do campo "Responsavel" ao orgSlug (esconder para contmax)
 
-### 1. Eliminar query extra de documentos
+## 2. Redistribuir responsaveis nas declaracoes P&G
 
-Substituir a query separada de `irpf_documents` por um count inline via Supabase, ou mover a contagem para ser feita sob demanda (lazy). Isso elimina 1 das 3 queries.
+Atualmente no P&G: 519 atribuidas a Pedro e 12 a Grazi (531 total). Precisam ficar divididas igualitariamente (~265/266).
 
-**Arquivo**: `src/hooks/useIrpf.ts`
-- Remover o bloco que faz `supabase.from("irpf_documents").select("irpf_case_id").in(...)` 
-- Usar `irpf_cases` com `.select("*, irpf_documents(count)")` para trazer o count direto no join (Supabase suporta isso)
+**Acao via SQL (usando insert tool)**:
+- Ordenar todos os 531 cases de P&G por `created_at`
+- Atribuir alternadamente: registros impares para Grazi, pares para Pedro (ou vice-versa)
+- Resultado: ~265 Grazi, ~266 Pedro
 
-### 2. Lazy loading da aba Pessoas
+```sql
+WITH numbered AS (
+  SELECT id, ROW_NUMBER() OVER (ORDER BY created_at) AS rn
+  FROM irpf_cases
+  WHERE tenant_id = '30e6da4c-ed58-47ce-8a83-289b58ca15ab'
+)
+UPDATE irpf_cases SET responsavel = CASE 
+  WHEN (SELECT rn FROM numbered WHERE numbered.id = irpf_cases.id) % 2 = 1 THEN 'Grazi'
+  ELSE 'Pedro'
+END
+WHERE tenant_id = '30e6da4c-ed58-47ce-8a83-289b58ca15ab';
+```
 
-Carregar pessoas somente quando o usuario clicar na aba "Pessoas", nao no carregamento inicial.
+## Resumo de arquivos
 
-**Arquivos**: `src/hooks/useIrpf.ts` e `src/pages/Irpf.tsx`
-- Separar o fetch de pessoas em uma funcao independente
-- Chamar apenas quando a aba for selecionada
-
-### 3. Adicionar staleTime ao React Query (opcional)
-
-Se desejar, podemos migrar o hook para usar `@tanstack/react-query` (ja instalado) para cache automatico e evitar recarregamentos desnecessarios.
-
-## Resultado esperado
-
-- Reducao de 3 queries para 1 query principal no carregamento inicial
-- Tempo de carregamento reduzido em ~40-50%
-- Experiencia mais fluida ao navegar entre abas
+| Arquivo | Alteracao |
+|---|---|
+| `src/components/irpf/IrpfDeclaracoesTable.tsx` | Prop `showResponsavel`, esconder coluna e filtro |
+| `src/pages/Irpf.tsx` | Passar prop baseada no orgSlug |
+| `src/pages/IrpfDetalhe.tsx` | Esconder campo responsavel para contmax |
+| SQL (insert tool) | Redistribuir responsaveis no P&G |
 
