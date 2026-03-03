@@ -1,71 +1,42 @@
 
 
-# Importacao em Massa de Socios para IRPF
+# Performance da Pagina IRPF - Diagnostico e Otimizacoes
 
-## Contexto
+## Diagnostico
 
-A tabela `irpf_people` esta vazia. A view `pg_socios_view` tem:
-- **Contmax**: 423 registros (314 CPFs unicos)
-- **P&G**: 603 registros (531 CPFs unicos)
+A pagina carrega **530 pessoas** e **530 declaracoes** (P&G) em 3 queries simultaneas. O volume atual nao e critico, mas ha otimizacoes simples que podem reduzir o tempo de carregamento.
 
-Um mesmo socio pode aparecer em varias empresas. A constraint `unique(tenant_id, cpf)` impede duplicatas.
+### Gargalos identificados
 
-## Solucao
+1. **Query de contagem de documentos**: apos carregar os cases, faz uma query `IN` com 530 IDs para contar documentos - essa query extra e desnecessaria se usarmos um count agregado no join
+2. **Carregamento de pessoas**: a aba "Pessoas" carrega todos os 530 registros mesmo sem estar visivel
+3. **Nenhum cache**: ao voltar para a pagina, tudo e recarregado do zero
 
-Adicionar um botao **"Importar Socios"** na pagina IRPF (ao lado do botao "Nova Pessoa"). Ao clicar:
+## Plano de Otimizacao
 
-1. Mostra um dialog de confirmacao com a contagem de socios que serao importados
-2. Executa a importacao via SQL (INSERT ... ON CONFLICT DO NOTHING)
-3. Para cada CPF unico, pega o primeiro registro da view (nome, cpf, empresa_id)
-4. Cria `irpf_people` com `source = "PG"` ou `"CONTMAX"` conforme o orgSlug
-5. **Opcionalmente** cria `irpf_cases` para o ano selecionado (com round-robin de responsavel)
-6. Exibe toast com resultado (X pessoas importadas, Y ja existiam)
+### 1. Eliminar query extra de documentos
 
-## Implementacao
+Substituir a query separada de `irpf_documents` por um count inline via Supabase, ou mover a contagem para ser feita sob demanda (lazy). Isso elimina 1 das 3 queries.
 
-### 1. Botao na pagina Irpf.tsx
+**Arquivo**: `src/hooks/useIrpf.ts`
+- Remover o bloco que faz `supabase.from("irpf_documents").select("irpf_case_id").in(...)` 
+- Usar `irpf_cases` com `.select("*, irpf_documents(count)")` para trazer o count direto no join (Supabase suporta isso)
 
-Adicionar botao "Importar Socios" ao lado de "Nova Pessoa", visivel apenas para quem tem `canEdit`.
+### 2. Lazy loading da aba Pessoas
 
-### 2. Dialog de confirmacao (IrpfImportarSociosDialog.tsx)
+Carregar pessoas somente quando o usuario clicar na aba "Pessoas", nao no carregamento inicial.
 
-- Ao abrir, consulta `pg_socios_view` filtrada pelo `tenant_id` e conta CPFs unicos que NAO existem em `irpf_people`
-- Checkbox: "Criar declaracoes para [ano selecionado]" (marcado por padrao)
-- Botao "Importar" com loading state
-- Progress feedback durante a importacao
+**Arquivos**: `src/hooks/useIrpf.ts` e `src/pages/Irpf.tsx`
+- Separar o fetch de pessoas em uma funcao independente
+- Chamar apenas quando a aba for selecionada
 
-### 3. Logica de importacao (no hook useIrpf.ts)
+### 3. Adicionar staleTime ao React Query (opcional)
 
-Nova funcao `bulkImportFromSocios`:
+Se desejar, podemos migrar o hook para usar `@tanstack/react-query` (ja instalado) para cache automatico e evitar recarregamentos desnecessarios.
 
-```text
-1. Buscar todos os registros de pg_socios_view para o tenant
-2. Agrupar por CPF (pegar primeiro registro de cada CPF unico)
-3. Para cada CPF unico:
-   a. INSERT em irpf_people (ON CONFLICT tenant_id+cpf ignorar)
-   b. Se checkbox de criar cases marcado: INSERT em irpf_cases
-4. Retornar contagem de criados vs ignorados
-```
+## Resultado esperado
 
-Como o Supabase JS nao tem ON CONFLICT nativo, a abordagem sera:
-- Buscar CPFs ja existentes em irpf_people para o tenant
-- Filtrar apenas os novos
-- Fazer batch insert dos novos (em lotes de 50)
-- Se criar cases, fazer batch insert dos cases
-
-### 4. Arquivos modificados
-
-| Arquivo | Alteracao |
-|---|---|
-| `src/pages/Irpf.tsx` | Adicionar botao "Importar Socios" e dialog |
-| `src/hooks/useIrpf.ts` | Adicionar funcao `bulkImportFromSocios` |
-| `src/components/irpf/IrpfImportarSociosDialog.tsx` | **Novo** - dialog de importacao |
-
-## Detalhes Tecnicos
-
-- Importacao em lotes de 50 registros para evitar timeout
-- Source definido pelo orgSlug: `pg` -> `"PG"`, `contmax` -> `"CONTMAX"`
-- `pg_empresa_id` e `pg_socio_cpf` preenchidos para manter o vinculo com a empresa
-- Para socios com multiplas empresas, sera usado o primeiro registro (a pessoa pode estar vinculada a mais de uma empresa, mas na tabela irpf_people so precisa de uma referencia)
-- O round-robin de responsavel funciona automaticamente via trigger no banco
+- Reducao de 3 queries para 1 query principal no carregamento inicial
+- Tempo de carregamento reduzido em ~40-50%
+- Experiencia mais fluida ao navegar entre abas
 
