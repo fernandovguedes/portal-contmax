@@ -31,6 +31,8 @@ const MODULE_ROUTES: Record<string, string> = {
   "dashboard-executivo": "/dashboard-executivo",
   "qualidade-atendimento": "/qualidade-atendimento",
   "integracoes": "/integracoes",
+  "irpf-pg": "/irpf/pg",
+  "irpf-contmax": "/irpf/contmax",
 };
 
 export default function Portal() {
