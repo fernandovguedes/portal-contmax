@@ -124,8 +124,6 @@ export async function enviarSaidasMes(
   mes: MesKey,
   ano: number
 ): Promise<ResultadoEnvio[]> {
-  if (!SYN_TOKEN) throw new Error("Token SYN não configurado.");
-
   const resultados: ResultadoEnvio[] = [];
   const empresasOk: string[] = [];
 
