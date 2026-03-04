@@ -156,7 +156,7 @@ const Index = () => {
 
     setEnviandoQuestor(true);
     try {
-      const resultados = await enviarSaidasMes(mesSelecionado, ANO_COMPETENCIA);
+      const resultados = await enviarSaidasMes(filtered, mesSelecionado, ANO_COMPETENCIA);
 
       const sucesso = resultados.filter((r) => r.sucesso).length;
       const erros = resultados.filter((r) => !r.sucesso);
