@@ -136,7 +136,7 @@ const Index = () => {
   });
 
   // Conta quantas empresas estão pendentes no mês selecionado
-  const totalPendentes = visibleEmpresas.filter(
+  const totalPendentes = filtered.filter(
     (e) => e.meses[mesSelecionado].lancadoQuestor === "pendente" &&
     (
       e.meses[mesSelecionado].faturamentoNacional > 0 ||
