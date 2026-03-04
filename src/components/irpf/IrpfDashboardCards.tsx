@@ -8,7 +8,7 @@ interface Props {
 
 export function IrpfDashboardCards({ cases }: Props) {
   const total = cases.length;
-  const aguardando = cases.filter(c => ["solicitar", "aguardando_docs"].includes(c.status)).length;
+  const aguardando = cases.filter(c => c.status === "aguardando_docs").length;
   const emAndamento = cases.filter(c => c.status === "em_andamento").length;
   const finalizados = cases.filter(c => ["entregue", "aguardando_pgto", "finalizado"].includes(c.status)).length;
 
