@@ -52,6 +52,10 @@ function numeroDocumento(mes: MesKey, ano: number): string {
   return `${String(MES_INDEX[mes]).padStart(2, "0")}${ano}`;
 }
 
+function limparCnpj(cnpj: string): string {
+  return cnpj.replace(/[^0-9]/g, "");
+}
+
 function formatarValor(valor: number): string {
   return valor.toFixed(2).replace(".", ",");
 }
@@ -66,7 +70,7 @@ function montarArquivoDados(
   const v = formatarValor(valor);
 
   const registroC = [
-    "C", cnpjEmpresa, CODIGO_CLIENTE, numDoc, numDoc,
+    "C", limparCnpj(cnpjEmpresa), CODIGO_CLIENTE, numDoc, numDoc,
     "REC", "", "", dataDoc, dataDoc, v,
     "0,00", "0,00", "0,00", "0,00", "3", "", "", "", "", "",
     "0,00", "0,00", "0,00", "0,00", "0,00", "0,00", "0,00",
@@ -92,12 +96,12 @@ async function enviarSaidaEmpresa(
   const dado = montarArquivoDados(empresa.cnpj, cfop, tipo.valor, dataDoc, numDoc);
 
   const payload = {
-    cnpjCliente: empresa.cnpj,
+    cnpjCliente: limparCnpj(empresa.cnpj),
     versao: SYN_VERSAO,
     grupoLayout: 201,
     dataDocumentos: dataDoc,
     dado,
-    cnpjContabilidade: [CNPJ_ESCRITORIO],
+    cnpjContabilidade: [limparCnpj(CNPJ_ESCRITORIO)],
   };
 
   try {
