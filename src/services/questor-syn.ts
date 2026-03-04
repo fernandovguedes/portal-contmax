@@ -6,10 +6,8 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Empresa, MesKey } from "@/types/fiscal";
 
-const SYN_BASE_URL = "https://syn.questor.com.br";
 const SYN_VERSAO = "2.00";
 const CNPJ_ESCRITORIO = "72.165.533/0001-34";
-const SYN_TOKEN = import.meta.env.VITE_QUESTOR_SYN_TOKEN ?? "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJncmF6aUBjb250bWF4Y29udGFiaWxpZGFkZS5jb20uYnIiLCJqdGkiOiI3NWU0NGE4Ni05ZWVhLTQ3NzUtOTI4ZS02NzBjYjRjNDJlMjkiLCJjbnBqIjoiNzIxNjU1MzMwMDAxMzQiLCJlaEVycCI6InRydWUiLCJodHRwOi8vc2NoZW1hcy5taWNyb3NvZnQuY29tL3dzLzIwMDgvMDYvaWRlbnRpdHkvY2xhaW1zL3JvbGUiOiJFcnAiLCJleHAiOjE4MDM3Mzg3NTIsImlzcyI6ImFwaWVycCIsImF1ZCI6ImFwaWVycCJ9.aAHVQdjQiZidDkkf7DlH9WEhhWUpMK0eNXpJKPZjvbM";
 const CODIGO_CLIENTE = "1";
 const TIPO_IMPOSTO_ISS = "3.01";
 
@@ -103,18 +101,12 @@ async function enviarSaidaEmpresa(
   };
 
   try {
-    const response = await fetch(`${SYN_BASE_URL}/api/v2/dados/inserir`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${SYN_TOKEN}`,
-      },
-      body: JSON.stringify(payload),
+    const { error } = await supabase.functions.invoke("questor-proxy", {
+      body: payload,
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      return { empresa: empresa.nome, cnpj: empresa.cnpj, tipo: tipo.chave, sucesso: false, erro: `HTTP ${response.status}: ${errorText}` };
+    if (error) {
+      return { empresa: empresa.nome, cnpj: empresa.cnpj, tipo: tipo.chave, sucesso: false, erro: error.message };
     }
 
     return { empresa: empresa.nome, cnpj: empresa.cnpj, tipo: tipo.chave, sucesso: true };
