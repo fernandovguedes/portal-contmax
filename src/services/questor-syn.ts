@@ -1,6 +1,7 @@
 /**
  * Questor SYN - Serviço de Integração
  * Envia dados de saídas fiscais do Portal Contmax para o Questor via API SYN
+ * Formato validado em 05/03/2026
  */
 
 import { supabase } from "@/integrations/supabase/client";
@@ -8,8 +9,10 @@ import type { Empresa, MesKey } from "@/types/fiscal";
 
 const SYN_VERSAO = "2.00";
 const CNPJ_ESCRITORIO = "72.165.533/0001-34";
-const CODIGO_CLIENTE = "1";
-const TIPO_IMPOSTO_ISS = "3.01";
+const CODIGO_CLIENTE = "1"; // Consumidor RS - código interno Questor
+const TIPO_IMPOSTO_ISS = "2"; // ISS=2 no Questor
+const SIGLA_ESTADO_FATO_GERADOR = "RS";
+const CODIGO_MUNIC_FATO_GERADOR = "80"; // Canoas/RS - código interno Questor
 
 const CFOP: Record<string, number> = {
   nacional: 9000002,
@@ -49,11 +52,8 @@ function numeroDocumento(mes: MesKey, ano: number): string {
     julho: 7, agosto: 8, setembro: 9,
     outubro: 10, novembro: 11, dezembro: 12,
   };
-  return `${String(MES_INDEX[mes]).padStart(2, "0")}${ano}`;
-}
-
-function limparCnpj(cnpj: string): string {
-  return cnpj.replace(/[^0-9]/g, "");
+  const mesNum = String(MES_INDEX[mes]).padStart(2, "0");
+  return `${mesNum}${ano}`;
 }
 
 function formatarValor(valor: number): string {
@@ -69,16 +69,70 @@ function montarArquivoDados(
 ): string {
   const v = formatarValor(valor);
 
+  // Registro C - 65 campos (formato validado em 05/03/2026)
   const registroC = [
-    "C", limparCnpj(cnpjEmpresa), CODIGO_CLIENTE, numDoc, numDoc,
-    "REC", "", "", dataDoc, dataDoc, v,
-    "0,00", "0,00", "0,00", "0,00", "3", "", "", "", "", "",
-    "0,00", "0,00", "0,00", "0,00", "0,00", "0,00", "0,00",
-    "N", "P", "1", "1", "99", "", "0", "", "", "", "", "N",
+    "C",                          // 1: tipo registro
+    cnpjEmpresa,                  // 2: CNPJ empresa (com máscara)
+    CODIGO_CLIENTE,               // 3: código cliente interno Questor (1=Consumidor RS)
+    numDoc,                       // 4: período inicial (MMAAAA)
+    numDoc,                       // 5: período final (MMAAAA)
+    "REC",                        // 6: espécie
+    "",                           // 7: série
+    "",                           // 8: subsérie
+    dataDoc,                      // 9: data escrituração
+    dataDoc,                      // 10: data emissão
+    v,                            // 11: valor contábil
+    "0,00",                       // 12: base ICMS
+    "0,00",                       // 13: valor ICMS
+    "0,00",                       // 14: isentas
+    "0,00",                       // 15: outras
+    "99",                         // 16: modelo (99=não entra SINTEGRA)
+    "",                           // 17: vazio
+    "",                           // 18: vazio
+    "0",                          // 19: 0
+    "",                           // 20: vazio
+    "",                           // 21: vazio
+    "0,00",                       // 22: base IPI
+    "0,00",                       // 23: valor IPI
+    "0,00",                       // 24: isentas IPI
+    "0,00",                       // 25: outras IPI
+    "0,00",                       // 26: valor frete
+    "0,00",                       // 27: valor seguro
+    "0,00",                       // 28: outras despesas
+    "0",                          // 29: acréscimo financeiro
+    "",                           // 30: emitente NF (vazio)
+    "0",                          // 31: finalidade operação (0=Normal)
+    "2",                          // 32: indicador pagamento (2=Outros)
+    "99",                         // 33: meio pagamento
+    "9",                          // 34: modalidade frete
+    "0",                          // 35: situação documento (0=Regular)
+    "",                           // 36: vazio
+    "",                           // 37: vazio
+    "",                           // 38: vazio
+    "~",                          // 39: til
+    "0",                          // 40: 0
+    "",                           // 41-58: 18 campos vazios
+    "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
+    SIGLA_ESTADO_FATO_GERADOR,    // 59: sigla estado fato gerador
+    CODIGO_MUNIC_FATO_GERADOR,    // 60: código município fato gerador (interno Questor)
+    "1",                          // 61
+    "2",                          // 62
+    "",                           // 63: vazio
+    "",                           // 64: vazio
+    "",                           // 65: vazio
   ].join(";");
 
+  // Registro D - natureza/CFOP
   const registroD = [
-    "D", cfop, TIPO_IMPOSTO_ISS, v, "0,00", "0,00", "0,00", "0,00", v,
+    "D",
+    cfop,               // CFOP
+    TIPO_IMPOSTO_ISS,   // tipo imposto (2=ISS)
+    v,                  // valor contábil
+    "0,00",             // base cálculo
+    "0,00",             // alíquota
+    "0,00",             // valor imposto
+    "0,00",             // isentas
+    v,                  // outras
   ].join(";");
 
   return `${registroC}\r\n${registroD}\r\n`;
@@ -96,12 +150,12 @@ async function enviarSaidaEmpresa(
   const dado = montarArquivoDados(empresa.cnpj, cfop, tipo.valor, dataDoc, numDoc);
 
   const payload = {
-    cnpjCliente: limparCnpj(empresa.cnpj),
+    cnpjCliente: empresa.cnpj,
     versao: SYN_VERSAO,
     grupoLayout: 201,
     dataDocumentos: dataDoc,
     dado,
-    cnpjContabilidade: [limparCnpj(CNPJ_ESCRITORIO)],
+    cnpjContabilidade: [CNPJ_ESCRITORIO],
   };
 
   try {
