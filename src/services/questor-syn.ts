@@ -69,69 +69,70 @@ function montarArquivoDados(
 ): string {
   const v = formatarValor(valor);
 
-  // Registro C - 65 campos (formato validado em 05/03/2026)
+  // Registro C - 64 campos (formato validado em 05/03/2026)
+  // Campos 41-57: 17 vazios entre "0" (campo 40) e RS (campo 58)
   const registroC = [
-    "C",                          // 1: tipo registro
-    cnpjEmpresa,                  // 2: CNPJ empresa (com máscara)
-    CODIGO_CLIENTE,               // 3: código cliente interno Questor (1=Consumidor RS)
-    numDoc,                       // 4: período inicial (MMAAAA)
-    numDoc,                       // 5: período final (MMAAAA)
-    "REC",                        // 6: espécie
-    "",                           // 7: série
-    "",                           // 8: subsérie
-    dataDoc,                      // 9: data escrituração
-    dataDoc,                      // 10: data emissão
-    v,                            // 11: valor contábil
-    "0,00",                       // 12: base ICMS
-    "0,00",                       // 13: valor ICMS
-    "0,00",                       // 14: isentas
-    "0,00",                       // 15: outras
-    "99",                         // 16: modelo (99=não entra SINTEGRA)
-    "",                           // 17: vazio
-    "",                           // 18: vazio
-    "",                           // 19: vazio
-    "0",                          // 20: 0
-    "",                           // 21: vazio
-    "0,00",                       // 22: base IPI
-    "0,00",                       // 23: valor IPI
-    "0,00",                       // 24: isentas IPI
-    "0,00",                       // 25: outras IPI
-    "0,00",                       // 26: valor frete
-    "0,00",                       // 27: valor seguro
-    "0,00",                       // 28: outras despesas
-    "0",                          // 29: acréscimo financeiro
-    "",                           // 30: emitente NF (vazio)
-    "0",                          // 31: finalidade operação (0=Normal)
-    "2",                          // 32: indicador pagamento (2=Outros)
-    "99",                         // 33: meio pagamento
-    "9",                          // 34: modalidade frete
-    "0",                          // 35: situação documento (0=Regular)
-    "",                           // 36: vazio
-    "",                           // 37: vazio
-    "",                           // 38: vazio
-    "~",                          // 39: til
-    "0",                          // 40: 0
-    "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", // 41-58: 18 campos vazios
-    SIGLA_ESTADO_FATO_GERADOR,    // 59: sigla estado fato gerador
-    CODIGO_MUNIC_FATO_GERADOR,    // 60: código município fato gerador (interno Questor)
-    "1",                          // 61
-    "2",                          // 62
-    "",                           // 63: vazio
-    "",                           // 64: vazio
-    "",                           // 65: vazio
+    "C",            // 1
+    cnpjEmpresa,    // 2
+    CODIGO_CLIENTE, // 3
+    numDoc,         // 4
+    numDoc,         // 5
+    "REC",          // 6
+    "",             // 7
+    "",             // 8
+    dataDoc,        // 9
+    dataDoc,        // 10
+    v,              // 11
+    "0,00",         // 12
+    "0,00",         // 13
+    "0,00",         // 14
+    "0,00",         // 15
+    "99",           // 16
+    "",             // 17
+    "",             // 18
+    "",             // 19
+    "0",            // 20
+    "",             // 21
+    "0,00",         // 22
+    "0,00",         // 23
+    "0,00",         // 24
+    "0,00",         // 25
+    "0,00",         // 26
+    "0,00",         // 27
+    "0,00",         // 28
+    "0",            // 29
+    "",             // 30
+    "0",            // 31
+    "2",            // 32
+    "99",           // 33
+    "9",            // 34
+    "0",            // 35
+    "",             // 36
+    "",             // 37
+    "",             // 38
+    "~",            // 39
+    "0",            // 40
+    "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", // 41-57: 17 vazios
+    SIGLA_ESTADO_FATO_GERADOR, // 58
+    CODIGO_MUNIC_FATO_GERADOR, // 59
+    "1",            // 60
+    "2",            // 61
+    "",             // 62
+    "",             // 63
+    "",             // 64
   ].join(";");
 
-  // Registro D - natureza/CFOP
+  // Registro D
   const registroD = [
     "D",
-    cfop,               // CFOP
-    TIPO_IMPOSTO_ISS,   // tipo imposto (2=ISS)
-    v,                  // valor contábil
-    "0,00",             // base cálculo
-    "0,00",             // alíquota
-    "0,00",             // valor imposto
-    "0,00",             // isentas
-    v,                  // outras
+    cfop,
+    TIPO_IMPOSTO_ISS,
+    v,
+    "0,00",
+    "0,00",
+    "0,00",
+    "0,00",
+    v,
   ].join(";");
 
   return `${registroC}\r\n${registroD}\r\n`;
@@ -168,7 +169,13 @@ async function enviarSaidaEmpresa(
 
     return { empresa: empresa.nome, cnpj: empresa.cnpj, tipo: tipo.chave, sucesso: true };
   } catch (err) {
-    return { empresa: empresa.nome, cnpj: empresa.cnpj, tipo: tipo.chave, sucesso: false, erro: err instanceof Error ? err.message : "Erro desconhecido" };
+    return {
+      empresa: empresa.nome,
+      cnpj: empresa.cnpj,
+      tipo: tipo.chave,
+      sucesso: false,
+      erro: err instanceof Error ? err.message : "Erro desconhecido",
+    };
   }
 }
 
