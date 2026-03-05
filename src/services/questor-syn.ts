@@ -89,8 +89,8 @@ function montarArquivoDados(
     "99",                         // 16: modelo (99=não entra SINTEGRA)
     "",                           // 17: vazio
     "",                           // 18: vazio
-    "0",                          // 19: 0
-    "",                           // 20: vazio
+    "",                          // 19: vazio
+    "0",                           // 20: 0
     "",                           // 21: vazio
     "0,00",                       // 22: base IPI
     "0,00",                       // 23: valor IPI
