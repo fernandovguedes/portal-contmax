@@ -111,7 +111,7 @@ function montarArquivoDados(
     "",                           // 38: vazio
     "~",                          // 39: til
     "0",                          // 40: 0
-    "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", // 41-58: 17 campos vazios
+    "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", // 41-58: 18 campos vazios
     SIGLA_ESTADO_FATO_GERADOR,    // 59: sigla estado fato gerador
     CODIGO_MUNIC_FATO_GERADOR,    // 60: código município fato gerador (interno Questor)
     "1",                          // 61
