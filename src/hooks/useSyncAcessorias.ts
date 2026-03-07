@@ -6,14 +6,13 @@ const POLL_TIMEOUT_MS = 600_000; // 10 minutes
 export interface SyncJob {
   id: string;
   status: string;
-  total_read: number;
-  total_created: number;
-  total_updated: number;
-  total_skipped: number;
-  total_errors: number;
+  total_processados: number;
+  total_matched: number;
+  total_ignored: number;
+  total_review: number;
+  execution_time_ms: number | null;
   error_message: string | null;
-  started_at: string;
-  finished_at: string | null;
+  created_at: string;
 }
 
 export interface SyncError {
@@ -56,11 +55,12 @@ export function useSyncAcessorias(tenantSlug: string | undefined, tenantId: stri
     if (!tenantId) return;
     setLoadingHistory(true);
     const { data } = await supabase
-      .from("sync_jobs")
-      .select("id, status, total_read, total_created, total_updated, total_skipped, total_errors, error_message, started_at, finished_at")
+      .from("integration_logs")
+      .select("id, status, total_processados, total_matched, total_ignored, total_review, execution_time_ms, error_message, created_at")
       .eq("tenant_id", tenantId)
-      .order("started_at", { ascending: false })
-      .limit(1);
+      .eq("integration", "acessorias")
+      .order("created_at", { ascending: false })
+      .limit(10);
     setHistory((data as SyncJob[]) ?? []);
     setLoadingHistory(false);
   }, [tenantId]);
@@ -79,10 +79,13 @@ export function useSyncAcessorias(tenantSlug: string | undefined, tenantId: stri
     
     pollRef.current = setInterval(async () => {
       const { data } = await supabase
-        .from("sync_jobs")
-        .select("id, status, total_read, total_created, total_updated, total_skipped, total_errors, error_message, started_at, finished_at")
-        .eq("id", jobId)
-        .single();
+        .from("integration_logs")
+        .select("id, status, total_processados, total_matched, total_ignored, total_review, execution_time_ms, error_message, created_at")
+        .eq("tenant_id", tenantId!)
+        .eq("integration", "acessorias")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
       if (data) {
         setResult(data as SyncJob);
@@ -101,7 +104,7 @@ export function useSyncAcessorias(tenantSlug: string | undefined, tenantId: stri
       setError({ message: "Timeout: a sincronização não finalizou em 10 minutos. Verifique o histórico." });
       fetchHistory();
     }, POLL_TIMEOUT_MS);
-  }, [fetchHistory, clearPolling]);
+  }, [fetchHistory, clearPolling, tenantId]);
 
   const pingSync = useCallback(async () => {
     setPinging(true);
@@ -143,25 +146,21 @@ export function useSyncAcessorias(tenantSlug: string | undefined, tenantId: stri
       }
 
       if (data?.job_id && data?.status === "running") {
-        // Backend still processing (shouldn't happen with sync mode, but keep as fallback)
-        setResult({ ...(data as any), total_read: 0, total_created: 0, total_updated: 0, total_skipped: 0, total_errors: 0, started_at: new Date().toISOString(), finished_at: null, error_message: null } as SyncJob);
         pollJobStatus(data.job_id);
       } else {
-        // Sync completed - backend returned final result
-        setResult({
-          id: data.job_id,
-          status: data.status ?? "success",
-          total_read: data.total_read ?? 0,
-          total_created: data.total_created ?? 0,
-          total_updated: data.total_updated ?? 0,
-          total_skipped: data.total_skipped ?? 0,
-          total_errors: data.total_errors ?? 0,
-          started_at: new Date().toISOString(),
-          finished_at: new Date().toISOString(),
-          error_message: null,
-        } as SyncJob);
+        // Sync completed - refresh from integration_logs
         setSyncing(false);
         await fetchHistory();
+        // Set result from the latest log
+        const { data: latest } = await supabase
+          .from("integration_logs")
+          .select("id, status, total_processados, total_matched, total_ignored, total_review, execution_time_ms, error_message, created_at")
+          .eq("tenant_id", tenantId!)
+          .eq("integration", "acessorias")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (latest) setResult(latest as SyncJob);
       }
     } catch (err: any) {
       const msg = err.message ?? "Erro ao sincronizar";
@@ -172,7 +171,7 @@ export function useSyncAcessorias(tenantSlug: string | undefined, tenantId: stri
       });
       setSyncing(false);
     }
-  }, [tenantSlug, fetchHistory, pollJobStatus]);
+  }, [tenantSlug, tenantId, fetchHistory, pollJobStatus]);
 
   return { syncing, result, error, history, loadingHistory, triggerSync, fetchHistory, pingSync, pingResult, pinging, functionUrl };
 }
