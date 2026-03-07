@@ -1419,6 +1419,10 @@ export type Database = {
         Args: { _tenant_slug: string; _user_id: string }
         Returns: boolean
       }
+      questor_inserir: {
+        Args: { p_payload: string; p_token: string }
+        Returns: number
+      }
     }
     Enums: {
       app_role: "admin" | "user"
