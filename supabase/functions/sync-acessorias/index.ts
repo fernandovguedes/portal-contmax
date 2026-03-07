@@ -236,18 +236,18 @@ async function finalizeIntegrationJob(
   const status = success ? "success" : "error";
   const executionTime = Date.now() - startTime;
 
-    if (integrationJobId) {
-      await supabase.from("integration_jobs").update({
-        status, progress: success ? 100 : 0, error_message: errorMsg,
-        finished_at: new Date().toISOString(), execution_time_ms: executionTime, result: { ...counters },
-      }).eq("id", integrationJobId);
-    }
+  if (integrationJobId) {
+    await supabase.from("integration_jobs").update({
+      status, progress: success ? 100 : 0, error_message: errorMsg,
+      finished_at: new Date().toISOString(), execution_time_ms: executionTime, result: { ...counters },
+    }).eq("id", integrationJobId);
+  }
 
-    if (tenantIntegrationId) {
-      await supabase.from("tenant_integrations").update({ last_status: status, last_error: errorMsg }).eq("id", tenantIntegrationId);
-    }
+  if (tenantIntegrationId) {
+    await supabase.from("tenant_integrations").update({ last_status: status, last_error: errorMsg }).eq("id", tenantIntegrationId);
+  }
 
-    await supabase.from("integration_logs").insert({
+  await supabase.from("integration_logs").insert({
     tenant_id: tenantId, integration: "acessorias", provider_slug: "acessorias",
     execution_id: crypto.randomUUID(), status, error_message: errorMsg,
     execution_time_ms: executionTime, total_processados: counters.totalRead,
@@ -255,14 +255,16 @@ async function finalizeIntegrationJob(
     total_ignored: counters.totalSkipped, total_review: 0, response: { ...counters },
   });
 
-  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  try {
-    await fetch(`${supabaseUrl}/functions/v1/process-integration-job`, {
-      method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceRoleKey}` },
-      body: JSON.stringify({}),
-    });
-  } catch (err) { console.error("[sync-acessorias] Failed to retrigger worker:", err); }
+  if (integrationJobId) {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    try {
+      await fetch(`${supabaseUrl}/functions/v1/process-integration-job`, {
+        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceRoleKey}` },
+        body: JSON.stringify({}),
+      });
+    } catch (err) { console.error("[sync-acessorias] Failed to retrigger worker:", err); }
+  }
 }
 
 function continueNextBatch(params: Record<string, any>) {
