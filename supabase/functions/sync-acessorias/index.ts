@@ -20,7 +20,7 @@ interface SyncCounters {
 }
 
 async function updateSyncJobProgress(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   jobId: string,
   counters: SyncCounters,
 ) {
@@ -33,7 +33,7 @@ async function updateSyncJobProgress(
   }).eq("id", jobId);
 }
 
-async function preloadEmpresas(supabase: ReturnType<typeof createClient>, tenantId: string) {
+async function preloadEmpresas(supabase: any, tenantId: string) {
   const { data: allEmpresas } = await supabase
     .from("empresas")
     .select("id, cnpj, hash_payload, data_baixa")
@@ -54,7 +54,7 @@ async function preloadEmpresas(supabase: ReturnType<typeof createClient>, tenant
 }
 
 async function processBatch(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   syncJobId: string,
   tenantId: string,
   apiToken: string,
@@ -224,8 +224,8 @@ async function processBatch(
 }
 
 async function finalizeIntegrationJob(
-  supabase: ReturnType<typeof createClient>,
-  integrationJobId: string,
+  supabase: any,
+  integrationJobId: string | null,
   tenantIntegrationId: string | null,
   tenantId: string,
   startTime: number,
@@ -236,10 +236,12 @@ async function finalizeIntegrationJob(
   const status = success ? "success" : "error";
   const executionTime = Date.now() - startTime;
 
-  await supabase.from("integration_jobs").update({
-    status, progress: success ? 100 : 0, error_message: errorMsg,
-    finished_at: new Date().toISOString(), execution_time_ms: executionTime, result: { ...counters },
-  }).eq("id", integrationJobId);
+  if (integrationJobId) {
+    await supabase.from("integration_jobs").update({
+      status, progress: success ? 100 : 0, error_message: errorMsg,
+      finished_at: new Date().toISOString(), execution_time_ms: executionTime, result: { ...counters },
+    }).eq("id", integrationJobId);
+  }
 
   if (tenantIntegrationId) {
     await supabase.from("tenant_integrations").update({ last_status: status, last_error: errorMsg }).eq("id", tenantIntegrationId);
@@ -253,14 +255,16 @@ async function finalizeIntegrationJob(
     total_ignored: counters.totalSkipped, total_review: 0, response: { ...counters },
   });
 
-  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  try {
-    await fetch(`${supabaseUrl}/functions/v1/process-integration-job`, {
-      method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceRoleKey}` },
-      body: JSON.stringify({}),
-    });
-  } catch (err) { console.error("[sync-acessorias] Failed to retrigger worker:", err); }
+  if (integrationJobId) {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    try {
+      await fetch(`${supabaseUrl}/functions/v1/process-integration-job`, {
+        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceRoleKey}` },
+        body: JSON.stringify({}),
+      });
+    } catch (err) { console.error("[sync-acessorias] Failed to retrigger worker:", err); }
+  }
 }
 
 function continueNextBatch(params: Record<string, any>) {
@@ -376,9 +380,7 @@ Deno.serve(async (req) => {
       total_errors: result.counters.totalErrors, finished_at: new Date().toISOString(),
     }).eq("id", currentSyncJobId);
 
-    if (integrationJobId) {
-      await finalizeIntegrationJob(supabase, integrationJobId, tenantIntegrationId, tenantId, batchStartTime, true, null, result.counters);
-    }
+    await finalizeIntegrationJob(supabase, integrationJobId, tenantIntegrationId, tenantId, batchStartTime, true, null, result.counters);
 
     return new Response(JSON.stringify({ success: true, job_id: currentSyncJobId, ...result.counters, message: "Sincronização concluída." }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (err) {

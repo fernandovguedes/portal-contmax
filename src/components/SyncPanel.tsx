@@ -9,7 +9,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { RefreshCw, Loader2, ChevronDown, ChevronUp, CheckCircle2, XCircle, Clock, Wifi } from "lucide-react";
-import { format, formatDistanceStrict } from "date-fns";
+import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 interface SyncPanelProps {
@@ -21,14 +21,15 @@ interface SyncPanelProps {
 function StatusBadgeSync({ status }: { status: string }) {
   if (status === "success")
     return <Badge className="bg-success/15 text-success border-success/30 gap-1"><CheckCircle2 className="h-3 w-3" /> OK</Badge>;
-  if (status === "failed")
+  if (status === "error")
     return <Badge variant="destructive" className="gap-1"><XCircle className="h-3 w-3" /> Erro</Badge>;
   return <Badge className="bg-warning/15 text-warning border-warning/30 gap-1"><Clock className="h-3 w-3" /> Executando</Badge>;
 }
 
-function duration(job: SyncJob) {
-  if (!job.finished_at) return "—";
-  return formatDistanceStrict(new Date(job.started_at), new Date(job.finished_at), { locale: ptBR });
+function formatDuration(ms: number | null) {
+  if (!ms) return "—";
+  if (ms < 1000) return `${ms}ms`;
+  return `${(ms / 1000).toFixed(1)}s`;
 }
 
 export function SyncPanel({ tenantSlug, tenantId, onSyncComplete }: SyncPanelProps) {
@@ -67,7 +68,7 @@ export function SyncPanel({ tenantSlug, tenantId, onSyncComplete }: SyncPanelPro
           </Button>
           {lastSync && (
             <span className="text-xs text-muted-foreground">
-              Última sync: {format(new Date(lastSync.started_at), "dd/MM HH:mm")}
+              Última sync: {format(new Date(lastSync.created_at), "dd/MM HH:mm")}
             </span>
           )}
         </div>
@@ -75,12 +76,10 @@ export function SyncPanel({ tenantSlug, tenantId, onSyncComplete }: SyncPanelPro
       {result && (
           <div className="flex items-center gap-2 text-xs">
             <StatusBadgeSync status={result.status} />
-            <span>Lidos: {result.total_read}</span>
-            <span className="text-success">+{result.total_created}</span>
-            <span className="text-warning">~{result.total_updated}</span>
-            <span className="text-muted-foreground">={result.total_skipped}</span>
-            {result.total_errors > 0 && <span className="text-destructive">✕{result.total_errors}</span>}
-            {result.status === "running" && <span className="text-muted-foreground animate-pulse">• atualizando a cada 3s</span>}
+            <span>Processados: {result.total_processados}</span>
+            <span className="text-success">Matched: {result.total_matched}</span>
+            <span className="text-muted-foreground">Ignorados: {result.total_ignored}</span>
+            {result.execution_time_ms && <span className="text-muted-foreground">Tempo: {formatDuration(result.execution_time_ms)}</span>}
           </div>
         )}
       </div>
@@ -136,25 +135,21 @@ export function SyncPanel({ tenantSlug, tenantId, onSyncComplete }: SyncPanelPro
                   <TableRow className="text-xs">
                     <TableHead>Data</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead className="text-center">Lidos</TableHead>
-                    <TableHead className="text-center">Criados</TableHead>
-                    <TableHead className="text-center">Atualizados</TableHead>
+                    <TableHead className="text-center">Processados</TableHead>
+                    <TableHead className="text-center">Matched</TableHead>
                     <TableHead className="text-center">Ignorados</TableHead>
-                    <TableHead className="text-center">Erros</TableHead>
-                    <TableHead>Duração</TableHead>
+                    <TableHead>Tempo</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {history.map((job) => (
                     <TableRow key={job.id} className="text-xs">
-                      <TableCell>{format(new Date(job.started_at), "dd/MM HH:mm")}</TableCell>
+                      <TableCell>{format(new Date(job.created_at), "dd/MM HH:mm")}</TableCell>
                       <TableCell><StatusBadgeSync status={job.status} /></TableCell>
-                      <TableCell className="text-center">{job.total_read}</TableCell>
-                      <TableCell className="text-center">{job.total_created}</TableCell>
-                      <TableCell className="text-center">{job.total_updated}</TableCell>
-                      <TableCell className="text-center">{job.total_skipped}</TableCell>
-                      <TableCell className="text-center">{job.total_errors}</TableCell>
-                      <TableCell>{duration(job)}</TableCell>
+                      <TableCell className="text-center">{job.total_processados}</TableCell>
+                      <TableCell className="text-center">{job.total_matched}</TableCell>
+                      <TableCell className="text-center">{job.total_ignored}</TableCell>
+                      <TableCell>{formatDuration(job.execution_time_ms)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

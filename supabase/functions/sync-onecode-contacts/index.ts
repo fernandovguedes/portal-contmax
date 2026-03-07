@@ -376,9 +376,9 @@ Deno.serve(async (req) => {
       await admin.from("integration_jobs").update({
         status: "error", progress: 0, error_message: err.message,
         finished_at: new Date().toISOString(), execution_time_ms: executionTime,
-      }).eq("id", integrationJobId).catch(() => {});
+      }).eq("id", integrationJobId);
       if (tenantIntegrationId) {
-        await admin.from("tenant_integrations").update({ last_status: "error", last_error: err.message }).eq("id", tenantIntegrationId).catch(() => {});
+        await admin.from("tenant_integrations").update({ last_status: "error", last_error: err.message }).eq("id", tenantIntegrationId);
       }
       const supabaseUrl2 = Deno.env.get("SUPABASE_URL")!;
       const srk = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
