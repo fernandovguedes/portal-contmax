@@ -151,6 +151,9 @@ export function EmpresaTable({ empresas, mesSelecionado, canEdit = true, onEdit,
               const fatTrimestreAnterior = trimestreAnterior ? calcularFaturamentoTrimestre(empresa, trimestreAnterior) : 0;
               const reinfObrigatoria = fatTrimestreAnterior > 0;
 
+              // ✅ ALTERADO: ícone NF verde quando há faturamento de NF no mês, não pelo cadastro
+              const temNfNoMes = mes.faturamentoNotaFiscal > 0;
+
               return (
                 <TableRow key={empresa.id} className={temAlerta || temAlertaTrimestral ? "bg-destructive/5" : ""}>
                   {onSelectionChange && (() => {
@@ -194,22 +197,27 @@ export function EmpresaTable({ empresas, mesSelecionado, canEdit = true, onEdit,
                       {empresa.regimeTributario === "simples_nacional" ? "SN" : "LP"}
                     </Badge>
                   </TableCell>
+
+                  {/* ✅ ALTERADO: verde se há NF lançada no mês, cinza se não há */}
                   <TableCell className="text-center">
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger>
-                          {empresa.emiteNotaFiscal ?
-                          <FileText className="h-4 w-4 text-success mx-auto" /> :
-
-                          <FileX className="h-4 w-4 text-muted-foreground mx-auto" />
-                          }
+                          {temNfNoMes ? (
+                            <FileText className="h-4 w-4 text-success mx-auto" />
+                          ) : (
+                            <FileX className="h-4 w-4 text-muted-foreground mx-auto" />
+                          )}
                         </TooltipTrigger>
                         <TooltipContent>
-                          {empresa.emiteNotaFiscal ? "Emite NF" : "Não emite NF"}
+                          {temNfNoMes
+                            ? `NF: ${mes.faturamentoNotaFiscal.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`
+                            : "Sem NF no mês"}
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
                   </TableCell>
+
                   <TableCell className="text-center">
                     <ExtratoSelect
                       value={mes.extratoEnviado}
@@ -304,7 +312,6 @@ export function EmpresaTable({ empresas, mesSelecionado, canEdit = true, onEdit,
                       {onSendWhatsApp && (() => {
                         const logInfo = whatsappLogs?.get(empresa.id);
                         if (mes.extratoEnviado === "nao" && logInfo) {
-                          // Already sent - show resend warning
                           const sentDate = format(new Date(logInfo.sentAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
                           return (
                             <TooltipProvider>
