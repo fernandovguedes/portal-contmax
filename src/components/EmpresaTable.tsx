@@ -1,5 +1,5 @@
 import { useRef, useCallback, useMemo } from "react";
-import { Empresa, MesKey, StatusEntrega, StatusExtrato, StatusQuestor, calcularDistribuicaoSocios, isMesFechamentoTrimestre, MESES_FECHAMENTO_TRIMESTRE, getMesesTrimestre, isMesDctfPosFechamento, getTrimestreFechamentoAnterior, calcularFaturamentoTrimestre } from "@/types/fiscal";
+import { Empresa, MesKey, StatusEntrega, StatusExtrato, StatusQuestor, calcularDistribuicaoSocios, isMesFechamentoTrimestre, MESES_FECHAMENTO_TRIMESTRE, getMesesTrimestre, isMesDctfPosFechamento, getTrimestreFechamentoAnterior, calcularFaturamentoTrimestre, usaDistribuicaoAutomatica } from "@/types/fiscal";
 import type { WhatsAppLogInfo } from "@/hooks/useWhatsAppLogs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge, ExtratoBadge, QuestorBadge } from "@/components/StatusBadge";
@@ -234,11 +234,18 @@ export function EmpresaTable({ empresas, mesSelecionado, canEdit = true, onEdit,
 
                   </TableCell>
                   <TableCell className="text-right">
-                    <DistribuicaoSociosPopover
-                      socios={empresa.socios}
-                      distribuicaoTotal={mes.distribuicaoLucros}
-                      label="Mensal" />
-
+                    {usaDistribuicaoAutomatica(empresa.regimeTributario) ? (
+                      <DistribuicaoSociosPopover
+                        socios={empresa.socios}
+                        distribuicaoTotal={mes.distribuicaoLucros}
+                        label="Mensal" />
+                    ) : (
+                      <span className="text-sm font-medium tabular-nums">
+                        {mes.distribuicaoLucros > 0
+                          ? mes.distribuicaoLucros.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
+                          : <span className="text-muted-foreground text-xs">—</span>}
+                      </span>
+                    )}
                   </TableCell>
                   {isFechamento &&
                   <>
