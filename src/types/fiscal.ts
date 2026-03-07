@@ -169,11 +169,13 @@ export function isEmpresaBaixadaVisivel(dataBaixa: string, mesSelecionado: MesKe
   return mesAtualIndex <= limiteIndex;
 }
 
+// ✅ regimeTributario opcional: LP não recebe cálculo automático de distribuição
 export function calcularFaturamento(
   dados: Omit<DadosMensais, "faturamentoTotal" | "distribuicaoLucros" | "lancadoQuestor" | "dctfWebSemMovimento"> 
-    & Partial<Pick<DadosMensais, "lancadoQuestor" | "dctfWebSemMovimento">>
+    & Partial<Pick<DadosMensais, "lancadoQuestor" | "dctfWebSemMovimento" | "distribuicaoLucros">>,
+  regimeTributario?: RegimeTributario
 ): DadosMensais {
-  // ✅ Se houver notasFiscais, recalcula faturamentoNotaFiscal como soma delas
+  // Se houver notasFiscais, recalcula faturamentoNotaFiscal como soma delas
   const faturamentoNotaFiscal = dados.notasFiscais && dados.notasFiscais.length > 0
     ? dados.notasFiscais.reduce((sum, nf) => sum + (nf.valor || 0), 0)
     : dados.faturamentoNotaFiscal;
@@ -184,7 +186,11 @@ export function calcularFaturamento(
     dados.faturamentoExterior +
     (dados.faturamentoAlugueis || 0);
 
-  const distribuicaoLucros = faturamentoTotal * 0.75;
+  // ✅ LP: não calcula automaticamente — preserva o valor manual ou mantém o que vier nos dados
+  const isLucroPresumido = regimeTributario === "lucro_presumido";
+  const distribuicaoLucros = isLucroPresumido
+    ? (dados.distribuicaoLucros ?? 0)
+    : faturamentoTotal * 0.75;
 
   return {
     ...dados,
@@ -194,6 +200,11 @@ export function calcularFaturamento(
     distribuicaoLucros,
     lancadoQuestor: dados.lancadoQuestor ?? "pendente",
   };
+}
+
+// Helper para verificar se o regime usa cálculo automático de distribuição
+export function usaDistribuicaoAutomatica(regime: RegimeTributario): boolean {
+  return regime !== "lucro_presumido";
 }
 
 export function calcularDistribuicaoSocios(socios: Socio[], distribuicaoTotal: number): Socio[] {
