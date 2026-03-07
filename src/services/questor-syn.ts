@@ -224,10 +224,10 @@ export async function enviarSaidasMes(
     await supabase
       .from("empresas")
       .update({
-        meses: {
+        meses: JSON.parse(JSON.stringify({
           ...empresa.meses,
           [mes]: { ...empresa.meses[mes], lancadoQuestor: "ok" },
-        },
+        })),
       })
       .eq("id", empresaId);
   }
